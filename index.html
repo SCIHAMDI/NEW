@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تسجيل الدخول - Al Center</title>
+<link rel="stylesheet" href="css/style.css">
+
+<!-- PWA Settings -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3498db">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="سنتر العلا">
+<link rel="apple-touch-icon" href="images/icon-192.png">
+
+  
+</head>
+<body>
+
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="logo-dot">AO</div>
+    <h2>Al Center - سنتر النجاح</h2>
+    <p class="sub">لوحة تحكم الأدمن - سجّل الدخول للمتابعة</p>
+
+    <div id="loginError" class="login-error"></div>
+
+    <form id="loginForm">
+      <div class="form-group">
+        <label>البريد الإلكتروني</label>
+        <input type="email" class="form-control" id="email" placeholder="admin@example.com" required>
+      </div>
+      <div class="form-group">
+        <label>كلمة المرور</label>
+        <input type="password" class="form-control" id="password" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="loginBtn">دخول</button>
+    </form>
+  </div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+  if (typeof loadAndApplyTheme === "function") loadAndApplyTheme("admin");
+
+  auth.onAuthStateChanged((user) => {
+    if (user) window.location.href = "admin.html";
+  });
+
+  document.getElementById("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const btn = document.getElementById("loginBtn");
+    const errBox = document.getElementById("loginError");
+    errBox.style.display = "none";
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin"></span> جاري الدخول...';
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+      window.location.href = "admin.html";
+    } catch (err) {
+      errBox.textContent = "بيانات الدخول غير صحيحة، حاول مرة أخرى.";
+      errBox.style.display = "block";
+      btn.disabled = false;
+      btn.innerHTML = "دخول";
+    }
+  });
+</script>
+</body>
+</html>

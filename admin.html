@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>لوحة تحكم الأدمن - Al Center</title>
+<link rel="stylesheet" href="css/style.css">
+
+<!-- PWA Settings -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#3498db">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="سنتر العلا">
+<link rel="apple-touch-icon" href="images/icon-192.png">
+
+  
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-actions">
+    <button class="btn-pill" id="logoutBtn"><span>تسجيل الخروج</span> 🚪</button>
+  </div>
+  <div class="topbar-brand" style="display:flex; align-items:center; gap:10px;">
+    <div class="theme-logo-slot" style="width:38px; height:38px; flex-shrink:0;"></div>
+    <div>
+      <h1>Al Center - سنتر النجاح</h1>
+      <p>لوحة تحكم الأدمن</p>
+    </div>
+  </div>
+</div>
+
+<div class="page-wrap" style="grid-template-columns:1fr;">
+  <div class="main-col" style="max-width:1100px; margin:0 auto; width:100%;">
+
+    <!-- Tabs -->
+    <div class="tabs" id="adminTabs">
+      <button class="tab-item active" data-tab="overview">🏠<span>الرئيسية</span></button>
+      <button class="tab-item" data-tab="create">➕<span>إنشاء طالب</span></button>
+      <button class="tab-item" data-tab="teachers">🧑‍🏫<span>المدرسين</span></button>
+      <button class="tab-item" data-tab="groups">👥<span>عدد الطلاب بالمجموعة</span></button>
+      <button class="tab-item" data-tab="grades">📝<span>إضافة درجات</span></button>
+      <button class="tab-item" data-tab="edit">✏️<span>تعديل بروفايل</span></button>
+      <button class="tab-item" data-tab="attendance">📷<span>الحضور والانصراف</span></button>
+      <button class="tab-item" data-tab="absentees">🚫<span>الغائبين</span></button>
+      <button class="tab-item" data-tab="payments">💳<span>المصروفات</span></button>
+      <button class="tab-item" data-tab="notes">💬<span>ملاحظات</span></button>
+      <button class="tab-item" data-tab="support">📮<span>الشكاوى والاستفسارات</span></button>
+      <button class="tab-item" data-tab="settings">⚙️<span>الإعدادات</span></button>
+    </div>
+
+    <!-- ============ TAB 0: الرئيسية ============ -->
+    <section class="panel tab-panel" id="tab-overview">
+      <div class="panel-title">🏠 نظرة عامة</div>
+      <div class="stat-grid cols-4" style="margin-bottom:20px;">
+        <div class="stat-card purple"><div class="icon">👥</div><div class="value" id="ov_totalStudents">0</div><div class="label">إجمالي الطلاب المسجلين</div></div>
+        <div class="stat-card teal"><div class="icon"><span class="presence-dot"></span> 📡</div><div class="value" id="ov_online">0</div><div class="label">متصلين بالموقع الآن</div></div>
+        <div class="stat-card orange"><div class="icon">👁️</div><div class="value" id="ov_pageViews">0</div><div class="label">عدد مرات فتح الموقع (إجمالي)</div></div>
+        <div class="stat-card yellow"><div class="icon">📅</div><div class="value" id="ov_todayPresent">0</div><div class="label">حضروا النهاردة</div></div>
+      </div>
+      <div class="stat-grid cols-4" style="margin-bottom:20px;">
+        <div class="stat-card orange"><div class="icon">🕐</div><div class="value" id="ov_views24h">0</div><div class="label">فتح الموقع آخر 24 ساعة</div></div>
+        <div class="stat-card purple"><div class="icon">🔗</div><div class="value" id="ov_directTraffic">0</div><div class="label">زوار عبر رابط مباشر</div></div>
+        <div class="stat-card teal"><div class="icon">✅</div><div class="value" id="ov_paidCount">0</div><div class="label">دفعوا مصاريف الشهر</div></div>
+        <div class="stat-card pink"><div class="icon">❌</div><div class="value" id="ov_unpaidCount">0</div><div class="label">لسه ما دفعوش الشهر ده</div></div>
+      </div>
+      <div class="stat-grid cols-4" style="margin-bottom:20px;">
+        <div class="stat-card purple"><div class="icon">💰</div><div class="value" id="ov_collectedTotal">0 ج</div><div class="label">إجمالي المحصّل هذا الشهر</div></div>
+        <div class="stat-card purple"><div class="icon">📋</div><div class="value" id="ov_requestsCount">0</div><div class="label">طلبات دفع أونلاين قيد المراجعة</div></div>
+        <div class="stat-card pink"><div class="icon">🚫</div><div class="value" id="ov_absentToday">0</div><div class="label">غائبين اليوم</div></div>
+        <div class="stat-card teal"><div class="icon">📮</div><div class="value" id="ov_openTickets">0</div><div class="label">استفسارات لم يتم الرد عليها</div></div>
+      </div>
+      <button class="btn btn-primary" id="openAllStudentsBtn">📋 عرض كل الطلاب (الأسماء والأكواد)</button>
+    </section>
+
+    <!-- ============ TAB: إنشاء حساب طالب ============ -->
+    <section class="panel tab-panel hidden" id="tab-create">
+      <div class="panel-title">👤 إنشاء حساب طالب جديد</div>
+      <form id="createForm">
+        <div class="row-2">
+          <div class="form-group">
+            <label>اسم الطالب</label>
+            <input type="text" class="form-control" id="c_name" required placeholder="مثال: بسنت أحمد محمد">
+          </div>
+          <div class="form-group">
+            <label>الصف الدراسي</label>
+            <input type="text" class="form-control" id="c_grade" required placeholder="مثال: الصف الثاني الثانوي">
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label>رقم ولي الأمر (واتساب) 📱</label>
+            <input type="tel" class="form-control" id="c_parentPhone" required placeholder="مثال: 01012345678">
+          </div>
+          <div class="form-group">
+            <label>العنوان (اختياري)</label>
+            <input type="text" class="form-control" id="c_address" placeholder="مثال: منيا القمح">
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label>رقم الطالب (اختياري)</label>
+            <input type="text" class="form-control" id="c_studentNumber" placeholder="مثال: رقم الجلوس / الرقم القومي (اختياري)">
+          </div>
+        </div>
+
+        <div class="panel-title" style="margin-top:8px;">🙂 بصمة الوجه (اختياري - لتسجيل حضور الطالب بالوجه بدل الكود)</div>
+        <div class="face-capture-box" id="c_faceBox">
+          <video id="c_faceVideo" autoplay muted playsinline></video>
+          <div class="face-actions">
+            <button type="button" class="btn btn-outline" id="c_startFaceCamBtn">📷 تشغيل الكاميرا</button>
+            <button type="button" class="btn btn-primary" id="c_captureFaceBtn" disabled>📸 التقاط وتسجيل بصمة الوجه</button>
+          </div>
+          <p id="c_faceStatus"></p>
+        </div>
+
+        <div class="panel-title" style="margin-top:8px;">📚 المواد والمواعيد والمصاريف</div>
+        <p style="font-size:12px; color:var(--text-mid); margin-bottom:12px;">اختر مدرس ومجموعة من القائمة (يتعبى تلقائي)، أو اكتب البيانات يدوياً.</p>
+        <div id="subjectsWrap"></div>
+        <button type="button" class="btn btn-outline" id="addSubjectBtn" style="margin-bottom:20px;">+ إضافة مادة / مجموعة</button>
+
+        <button type="submit" class="btn btn-primary btn-block" id="createBtn">إنشاء الحساب وتوليد الكود</button>
+      </form>
+
+      <div id="createResult" class="hidden" style="margin-top:22px;">
+        <div class="panel" style="background: var(--bg); text-align:center;">
+          <p style="font-size:13.5px; color:var(--text-mid); font-weight:700; margin-bottom:8px;">تم إنشاء الحساب بنجاح ✅</p>
+          <p style="font-size:26px; font-weight:800; color:var(--purple-dark);" id="resultCode"></p>
+          <p style="font-size:13px; color:var(--text-mid); margin:10px 0;">رابط بروفايل الطالب:</p>
+          <input class="form-control" id="resultLink" readonly style="text-align:center; font-size:12.5px; margin-bottom:16px;">
+          <div id="resultQr" style="display:flex; justify-content:center;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TAB: المدرسين ============ -->
+    <section class="panel tab-panel hidden" id="tab-teachers">
+      <div class="panel-title">🧑‍🏫 إدارة المدرسين والمجموعات</div>
+      <form id="teacherForm" style="margin-bottom:22px;">
+        <div class="row-2">
+          <div class="form-group">
+            <label>اسم المدرس / المادة</label>
+            <input type="text" class="form-control" id="t_name" required placeholder="مثال: أ. أحمد - رياضيات">
+          </div>
+          <div class="form-group" style="align-self:end;">
+            <button type="submit" class="btn btn-primary btn-block">+ إضافة مدرس جديد</button>
+          </div>
+        </div>
+      </form>
+
+      <div id="teachersList"></div>
+      <p class="empty-box hidden" id="teachersEmpty">لا يوجد مدرسين مسجلين بعد</p>
+    </section>
+
+    <!-- ============ TAB: عدد الطلاب في المجموعة ============ -->
+    <section class="panel tab-panel hidden" id="tab-groups">
+      <div class="panel-title">👥 عدد الطلاب في كل مجموعة</div>
+      <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:14px;">
+        هذا العدد بيتزود تلقائياً بمجرد تسجيل طالب جديد في نفس المدرس/المجموعة. "سجل اليوم" بيتصفر كل 24 ساعة، أما "إجمالي الطلاب" في كل مجموعة فهو ثابت ولا يتصفر أبداً ولا يحسب الطالب أكتر من مرة.
+      </p>
+      <div class="stat-grid" style="margin-bottom:18px;">
+        <div class="stat-card purple"><div class="icon">👥</div><div class="value" id="gr_totalAll">0</div><div class="label">إجمالي الطلاب الكلي (لا يتصفر)</div></div>
+        <div class="stat-card teal"><div class="icon">📅</div><div class="value" id="gr_presentToday">0</div><div class="label">حضور اليوم (سجل 24 ساعة)</div></div>
+      </div>
+      <div id="groupsOverviewList"></div>
+      <p class="empty-box hidden" id="groupsOverviewEmpty">لا توجد مجموعات مسجلة بعد</p>
+    </section>
+
+    <!-- ============ TAB: إضافة درجات (3 مربعات) ============ -->
+    <section class="panel tab-panel hidden" id="tab-grades">
+      <div class="panel-title">📝 إضافة درجات الامتحانات</div>
+
+      <div class="step-box">
+        <div class="step-num">1</div>
+        <div class="step-content">
+          <label style="font-size:13px; font-weight:700; color:var(--text-mid); display:block; margin-bottom:7px;">كود الطالب</label>
+          <div style="display:flex; gap:10px;">
+            <input type="text" class="form-control" id="g_code" placeholder="اكتب كود الطالب هنا...">
+            <button type="button" class="btn btn-primary" id="g_searchBtn" style="white-space:nowrap;">بحث</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-box" id="g_studentBox" style="display:none;">
+        <div class="step-num">2</div>
+        <div class="step-content">
+          <label style="font-size:13px; font-weight:700; color:var(--text-mid); display:block; margin-bottom:4px;">اسم الطالب (تأكيد)</label>
+          <p id="g_studentName" style="font-size:16px; font-weight:800; color:var(--purple-dark);"></p>
+        </div>
+      </div>
+
+      <form id="gradeForm" class="hidden">
+        <div class="step-box" style="align-items:flex-start;">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="row-2">
+              <div class="form-group">
+                <label>اسم الامتحان</label>
+                <input type="text" class="form-control" id="g_examName" required placeholder="مثال: امتحان الشهر - وحدة 1">
+              </div>
+              <div class="form-group">
+                <label>تاريخ الامتحان</label>
+                <input type="date" class="form-control" id="g_examDate" required>
+              </div>
+            </div>
+            <div class="row-2">
+              <div class="form-group">
+                <label>الدرجة</label>
+                <input type="number" class="form-control" id="g_score" required placeholder="مثال: 27">
+              </div>
+              <div class="form-group">
+                <label>الدرجة النهائية</label>
+                <input type="number" class="form-control" id="g_maxScore" required placeholder="مثال: 30">
+              </div>
+            </div>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">حفظ الدرجة في سجل الطالب</button>
+      </form>
+
+      <div class="panel-title" style="margin-top:24px;">آخر الدرجات المُضافة لهذا الطالب</div>
+      <div class="table-wrap">
+        <table class="data-table" id="g_gradesTable">
+          <thead><tr><th>الامتحان</th><th>التاريخ</th><th>الدرجة</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="empty-box hidden" id="g_emptyGrades">لا توجد درجات مسجلة بعد</p>
+    </section>
+
+    <!-- ============ TAB: تعديل بروفايل طالب ============ -->
+    <section class="panel tab-panel hidden" id="tab-edit">
+      <div class="panel-title">✏️ تعديل بروفايل طالب</div>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <input type="text" class="form-control" id="e_code" placeholder="اكتب كود الطالب للبحث...">
+        <button type="button" class="btn btn-primary" id="e_searchBtn" style="white-space:nowrap;">بحث</button>
+      </div>
+
+      <div id="e_codeQrBox" class="hidden" style="margin-bottom:20px;">
+        <div class="panel" style="background: var(--bg); text-align:center;">
+          <p style="font-size:13.5px; color:var(--text-mid); font-weight:700; margin-bottom:8px;">كود الطالب و QR الخاص به</p>
+          <p style="font-size:24px; font-weight:800; color:var(--purple-dark);" id="e_codeDisplay"></p>
+          <div id="e_qrDisplay" style="display:flex; justify-content:center; margin-top:8px;"></div>
+        </div>
+      </div>
+
+      <form id="editForm" class="hidden">
+        <div class="row-2">
+          <div class="form-group">
+            <label>اسم الطالب</label>
+            <input type="text" class="form-control" id="e_name" required>
+          </div>
+          <div class="form-group">
+            <label>الصف الدراسي</label>
+            <input type="text" class="form-control" id="e_grade" required>
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label>رقم ولي الأمر (واتساب) 📱</label>
+            <input type="tel" class="form-control" id="e_parentPhone" required>
+          </div>
+          <div class="form-group">
+            <label>العنوان</label>
+            <input type="text" class="form-control" id="e_address">
+          </div>
+        </div>
+        <div class="row-2">
+          <div class="form-group">
+            <label>رقم الطالب (اختياري)</label>
+            <input type="text" class="form-control" id="e_studentNumber">
+          </div>
+        </div>
+
+        <div class="panel-title" style="margin-top:8px;">🙂 بصمة الوجه</div>
+        <p id="e_faceCurrentStatus" style="font-size:12.5px; color:var(--text-mid); margin-bottom:10px;"></p>
+        <div class="face-capture-box" id="e_faceBox">
+          <video id="e_faceVideo" autoplay muted playsinline></video>
+          <div class="face-actions">
+            <button type="button" class="btn btn-outline" id="e_startFaceCamBtn">📷 تشغيل الكاميرا</button>
+            <button type="button" class="btn btn-primary" id="e_captureFaceBtn" disabled>📸 التقاط وتحديث بصمة الوجه</button>
+          </div>
+          <p id="e_faceStatus"></p>
+        </div>
+
+        <div class="panel-title" style="margin-top:8px;">📚 المواد والمواعيد والمصاريف</div>
+        <div id="e_subjectsWrap"></div>
+        <button type="button" class="btn btn-outline" id="e_addSubjectBtn" style="margin-bottom:20px;">+ إضافة مادة / مجموعة</button>
+
+        <div style="display:flex; gap:12px;">
+          <button type="submit" class="btn btn-primary" style="flex:1;">حفظ التعديلات</button>
+          <button type="button" class="btn btn-danger" id="e_deleteBtn">حذف الطالب</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ============ TAB: الحضور والانصراف ============ -->
+    <section class="panel tab-panel hidden" id="tab-attendance">
+      <div class="panel-title">📷 نظام الحضور والانصراف</div>
+
+      <div class="form-group">
+        <label>إدخال / مسح الكود (يدوي - أو باركود سكانر متوصل بالكمبيوتر)</label>
+        <input type="text" class="code-scan-input" id="manualCodeInput" placeholder="اكتب الكود أو استخدم جهاز الباركود ثم Enter" autocomplete="off">
+        <p class="scan-hint">جهاز الباركود بيشتغل زي الكيبورد عادي - اضغط جوه المربع وامسح الكارت مباشرة.</p>
+      </div>
+
+      <div style="text-align:center; margin:16px 0;">
+        <button class="btn btn-outline" id="toggleScanBtn">📷 تشغيل الكاميرا (QR)</button>
+        <button class="btn btn-outline" id="toggleFaceBtn">🙂 تشغيل كاميرا بصمة الوجه</button>
+      </div>
+      <div id="qr-reader" style="max-width:420px; margin:0 auto;"></div>
+
+      <div class="face-capture-box hidden" id="att_faceBox" style="max-width:420px; margin:0 auto;">
+        <video id="att_faceVideo" autoplay muted playsinline></video>
+        <p id="att_faceStatus"></p>
+      </div>
+
+      <div id="scanResult" class="scan-result hidden"></div>
+
+      <div class="panel-title" style="margin-top:26px;">⏰ فاتهم معادهم النهاردة</div>
+      <div id="missedList"></div>
+      <p class="empty-box hidden" id="missedEmpty">مفيش حد فايته معاده لحد دلوقتي 👍</p>
+
+      <div class="panel-title" style="margin-top:26px;">آخر عمليات الحضور اليوم</div>
+      <div class="table-wrap">
+        <table class="data-table" id="attTable">
+          <thead><tr><th>الكود</th><th>الاسم</th><th>الحالة</th><th>الوقت</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="empty-box hidden" id="attEmpty">لا توجد عمليات مسجلة اليوم</p>
+    </section>
+
+    <!-- ============ TAB: الغائبين (يومي) ============ -->
+    <section class="panel tab-panel hidden" id="tab-absentees">
+      <div class="panel-title">🚫 قائمة الغائبين اليوم</div>
+      <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:14px;">
+        القائمة دي بتتجدد تلقائياً كل يوم. الطالب اللي معاه مجموعة واحدة بيتحسب غايب لو فات معاده بـ 15 دقيقة، ولو معاه أكتر من مجموعة لنفس المدرس في نفس اليوم بينتظر النظام لحد آخر معاد ليه.
+        إرسال الواتساب هنا بضغطة واحدة (المتصفح لا يسمح بإرسال تلقائي 100% بدون تدخل بسبب سياسات النوافذ المنبثقة - التفاصيل في README).
+      </p>
+      <div style="display:flex; gap:10px; margin-bottom:14px;">
+        <button class="btn btn-outline" id="ab_refreshBtn">🔄 تحديث القائمة</button>
+        <button class="btn btn-primary" id="ab_sendAllBtn">📱 إرسال تنبيه للكل (واحد تلو الآخر)</button>
+      </div>
+      <div id="absenteesList"></div>
+      <p class="empty-box hidden" id="absenteesEmpty">لا يوجد غائبين مسجلين حتى الآن اليوم 👍</p>
+    </section>
+
+    <!-- ============ TAB: المصروفات ============ -->
+    <section class="panel tab-panel hidden" id="tab-payments">
+      <div class="panel-title">💳 متابعة المصروفات</div>
+      <div style="display:flex; gap:10px; margin-bottom:20px;">
+        <input type="text" class="form-control" id="pay_code" placeholder="اكتب كود الطالب للبحث...">
+        <button type="button" class="btn btn-primary" id="pay_searchBtn" style="white-space:nowrap;">بحث</button>
+      </div>
+
+      <div id="pay_studentBox" class="hidden">
+        <p style="font-weight:800; font-size:15px; margin-bottom:4px;" id="pay_studentName"></p>
+        <div class="form-group" style="max-width:260px; margin-bottom:10px;">
+          <label>عرض/تسجيل حالة الدفع لشهر:</label>
+          <select class="form-control" id="pay_monthSelect"></select>
+        </div>
+        <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:14px;">شهر <b id="pay_monthLabel"></b> — اضغط ✓ لتأكيد دفع المادة أو ✗ لعدم الدفع (التعديل متاح للشهر الحالي والشهور القادمة فقط، والشهور اللي فاتت تُعرض للمراجعة بس)</p>
+        <div id="pay_subjectsWrap"></div>
+        <p class="empty-box hidden" id="pay_noSubjects">لا توجد مواد مسجلة لهذا الطالب</p>
+      </div>
+
+      <div class="panel-title" style="margin-top:28px;">📩 طلبات الدفع الأونلاين (قيد المراجعة)</div>
+      <div id="pay_requestsList"></div>
+      <p class="empty-box hidden" id="pay_requestsEmpty">لا توجد طلبات دفع جديدة</p>
+    </section>
+
+    <!-- ============ TAB: ملاحظات ============ -->
+    <section class="panel tab-panel hidden" id="tab-notes">
+      <div class="panel-title">💬 إرسال ملاحظة</div>
+      <div class="form-group" style="max-width:320px; margin-bottom:16px;">
+        <label>وضع الإرسال</label>
+        <select class="form-control" id="n_mode">
+          <option value="single">طالب واحد بالكود</option>
+          <option value="filter">حسب الصف والمادة (بث موجّه)</option>
+          <option value="all">إرسال للجميع</option>
+        </select>
+      </div>
+
+      <div id="n_singleBox">
+        <div style="display:flex; gap:10px; margin-bottom:14px;">
+          <input type="text" class="form-control" id="n_code" placeholder="اكتب كود الطالب أو امسحه...">
+          <button type="button" class="btn btn-primary" id="n_searchBtn" style="white-space:nowrap;">بحث</button>
+        </div>
+        <div id="n_studentBox" class="hidden">
+          <p style="font-weight:800; font-size:15px; margin-bottom:12px;" id="n_studentName"></p>
+        </div>
+      </div>
+
+      <div id="n_filterBox" class="hidden">
+        <div class="row-2">
+          <div class="form-group">
+            <label>الصف الدراسي</label>
+            <select class="form-control" id="n_filterGrade"><option value="">كل الصفوف</option></select>
+          </div>
+          <div class="form-group">
+            <label>المادة</label>
+            <select class="form-control" id="n_filterSubject"><option value="">كل المواد</option></select>
+          </div>
+        </div>
+        <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:6px;" id="n_filterCount">اختر الصف و/أو المادة لمعرفة عدد الطلاب المستهدفين</p>
+      </div>
+
+      <div id="n_allBox" class="hidden">
+        <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:6px;">هيتم إرسال نفس الملاحظة لكل الطلاب المسجلين في النظام (<span id="n_allCount">0</span> طالب).</p>
+      </div>
+
+      <div class="form-group" style="margin-top:10px;">
+        <label>نص الملاحظة</label>
+        <textarea class="form-control" id="n_text" placeholder="مثال: الطالب كان مشاغب اليوم وغير مهتم بالحصة"></textarea>
+      </div>
+      <button class="btn btn-primary" id="n_sendBtn">حفظ الملاحظة وإرسالها عبر واتساب</button>
+      <div id="n_waSlot" style="margin-top:10px;"></div>
+
+      <div class="panel-title" style="margin-top:24px;" id="n_listTitle">آخر الملاحظات</div>
+      <div id="n_list"></div>
+      <p class="empty-box hidden" id="n_empty">لا توجد ملاحظات سابقة</p>
+    </section>
+
+    <!-- ============ TAB: الشكاوى والاستفسارات ============ -->
+    <section class="panel tab-panel hidden" id="tab-support">
+      <div class="panel-title">📮 صندوق الشكاوى والاستفسارات</div>
+      <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:14px;">المحادثات بتتحذف تلقائياً بعد 24 ساعة من آخر رسالة.</p>
+      <div class="row-2" style="align-items:start;">
+        <div>
+          <div class="panel-title" style="font-size:13px;">المحادثات</div>
+          <div id="supportConvList" style="max-height:420px; overflow-y:auto;"></div>
+          <p class="empty-box hidden" id="supportConvEmpty">لا توجد استفسارات حالياً</p>
+        </div>
+        <div>
+          <div class="panel-title" style="font-size:13px;">المحادثة</div>
+          <div id="supportMessages" style="max-height:320px; overflow-y:auto; margin-bottom:10px;"></div>
+          <div id="supportReplyBox" class="hidden" style="display:flex; gap:8px;">
+            <input type="text" class="form-control" id="supportReplyInput" placeholder="اكتب رد...">
+            <button class="btn btn-primary" id="supportReplyBtn">إرسال</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ TAB: الإعدادات ============ -->
+    <section class="panel tab-panel hidden" id="tab-settings">
+      <div class="panel-title">⚙️ إعدادات النظام</div>
+
+      <div class="panel-title" style="font-size:14px; margin-top:6px;">🌐 اللغة</div>
+      <div style="display:flex; gap:10px; margin-bottom:22px;">
+        <button class="btn btn-outline" id="settingsLangAr">العربية</button>
+        <button class="btn btn-outline" id="settingsLangEn">English</button>
+      </div>
+
+      <div class="panel-title" style="font-size:14px;">🎨 الثيم والتخصيص - لوحة الأدمن</div>
+      <div class="row-2" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label>لوجو لوحة الأدمن</label>
+          <input type="file" accept="image/*" class="form-control" id="settingsAdminLogo">
+        </div>
+        <div class="form-group">
+          <label>خلفية لوحة الأدمن</label>
+          <input type="file" accept="image/*" class="form-control" id="settingsAdminBg">
+        </div>
+      </div>
+      <div class="row-2" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label>لون الشريط العلوي (لوحة الأدمن)</label>
+          <input type="color" class="form-control" id="settingsAdminTopbar" value="#3498db" style="height:44px; padding:4px;">
+        </div>
+        <div class="form-group">
+          <label>الوضع</label>
+          <select class="form-control" id="settingsAdminMode">
+            <option value="light">مضيء ☀️</option>
+            <option value="dark">ليلي 🌙</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="settingsSaveAdminBtn" style="margin-bottom:26px;">💾 حفظ ثيم لوحة الأدمن</button>
+
+      <div class="panel-title" style="font-size:14px;">🎨 الثيم والتخصيص - صفحة الطالب</div>
+      <div class="row-2" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label>لوجو صفحة الطالب</label>
+          <input type="file" accept="image/*" class="form-control" id="settingsStudentLogo">
+        </div>
+        <div class="form-group">
+          <label>خلفية صفحة الطالب</label>
+          <input type="file" accept="image/*" class="form-control" id="settingsStudentBg">
+        </div>
+      </div>
+      <div class="row-2" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label>لون الشريط العلوي (صفحة الطالب)</label>
+          <input type="color" class="form-control" id="settingsStudentTopbar" value="#3498db" style="height:44px; padding:4px;">
+        </div>
+        <div class="form-group">
+          <label>الوضع</label>
+          <select class="form-control" id="settingsStudentMode">
+            <option value="light">مضيء ☀️</option>
+            <option value="dark">ليلي 🌙</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="settingsSaveStudentBtn" style="margin-bottom:10px;">💾 حفظ ثيم صفحة الطالب</button>
+
+      <div class="row-2" style="margin-bottom:26px;">
+        <div class="form-group">
+          <label>شفافية خلفية لوحة الأدمن (0 = خلفية واضحة تماماً، 100 = مخفية شبه كلياً)</label>
+          <input type="range" min="0" max="100" value="85" class="form-control" id="settingsAdminOpacity" style="padding:0;">
+          <p style="font-size:11.5px; color:var(--text-mid); margin-top:4px;">القيمة الحالية: <span id="settingsAdminOpacityVal">85</span>%</p>
+        </div>
+        <div class="form-group">
+          <label>شفافية خلفية صفحة الطالب</label>
+          <input type="range" min="0" max="100" value="85" class="form-control" id="settingsStudentOpacity" style="padding:0;">
+          <p style="font-size:11.5px; color:var(--text-mid); margin-top:4px;">القيمة الحالية: <span id="settingsStudentOpacityVal">85</span>%</p>
+        </div>
+      </div>
+
+      <div class="panel-title" style="font-size:14px;">📱 أتمتة إرسال الواتساب</div>
+      <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:12px;">
+        المتصفح وحده مينفعش يبعت واتساب 100% بدون تدخل بشري (قيد تقني من واتساب نفسه). لو عايز أتمتة حقيقية بالكامل من غير ما تفتح أي نافذة خالص، اربط رابط API خارجي (Make.com / Zapier / سيرفر Twilio خاص بيك) وهنبعتله كل رسالة أوتوماتيك في الخلفية.
+      </p>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>
+          <input type="checkbox" id="settingsDisableAutoPopup" style="width:auto; margin-left:8px;">
+          منع فتح نافذة واتساب تلقائياً عند تسجيل الحضور/الانصراف (يفضل بس الزرار اليدوي)
+        </label>
+      </div>
+      <div class="form-group" style="margin-bottom:14px;">
+        <label>رابط API خارجي لإرسال واتساب آلياً بالكامل (اختياري)</label>
+        <input type="url" class="form-control" id="settingsWebhookUrl" placeholder="https://hook.eu1.make.com/xxxxxxxxxx">
+      </div>
+      <button class="btn btn-primary" id="settingsSaveWaBtn" style="margin-bottom:26px;">💾 حفظ إعدادات الواتساب</button>
+
+      <div class="panel-title" style="font-size:14px;">🔔 صوت الإشعارات</div>
+      <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:12px;">
+        بيتشغل صوت تلقائي عند: تسجيل حضور/انصراف (بالكود أو الباركود أو بصمة الوجه)، تأكيد دفع مصروفات، وإنشاء حساب طالب جديد. في حالة عدم رفع صوت مخصص، هيتشغل صوت تنبيه بسيط افتراضي.
+      </p>
+      <div class="form-group" style="margin-bottom:10px;">
+        <label>اختيار/رفع صوت الإشعارات (ملف صوتي قصير)</label>
+        <input type="file" accept="audio/*" class="form-control" id="settingsNotifySound">
+      </div>
+      <div style="display:flex; gap:8px; margin-bottom:26px;">
+        <button class="btn btn-outline" id="settingsTestSoundBtn">🔊 تجربة الصوت الحالي</button>
+        <button class="btn btn-outline" id="settingsResetSoundBtn">↩️ رجوع للصوت الافتراضي</button>
+      </div>
+
+      <div class="panel-title" style="font-size:14px;">📒 سجل المصاريف الإجمالي</div>
+      <div class="stat-grid" style="margin-bottom:14px;">
+        <div class="stat-card teal"><div class="icon">💰</div><div class="value" id="ledgerTotal">0 ج</div><div class="label">إجمالي هذا الشهر (عادي + أونلاين)</div></div>
+        <div class="stat-card purple"><div class="icon">📅</div><div class="value" id="ledgerMonthLabel">-</div><div class="label">الشهر الحالي</div></div>
+      </div>
+      <div class="table-wrap" style="margin-bottom:10px;">
+        <table class="data-table" id="ledgerTable">
+          <thead><tr><th>الطالب</th><th>المادة</th><th>المبلغ</th><th>النوع</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="empty-box hidden" id="ledgerEmpty">لا توجد مدفوعات مسجلة هذا الشهر بعد</p>
+      <div class="form-group" style="max-width:260px; margin-top:14px;">
+        <label>عرض أرشيف شهر سابق</label>
+        <select class="form-control" id="ledgerArchiveSelect"><option value="">اختر شهر...</option></select>
+      </div>
+      <div id="ledgerArchiveResult" style="margin-top:10px;"></div>
+
+      <div class="panel-title" style="font-size:14px; margin-top:26px; color:var(--pink);">⚠️ أدوات إدارية حساسة</div>
+      <div class="row-2" style="margin-bottom:10px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label>إنشاء حسابات وهمية للاختبار</label>
+          <div style="display:flex; gap:8px;">
+            <input type="number" class="form-control" id="settingsTestCount" placeholder="عدد الحسابات مثلاً 10" min="1" max="200">
+            <button class="btn btn-outline" id="settingsGenTestBtn" style="white-space:nowrap;">توليد</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>حذف طالب معين (بحث بالاسم / الكود)</label>
+          <button class="btn btn-outline btn-block" id="settingsOpenDeleteOneBtn">🔍 بحث وحذف طالب</button>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-block" id="settingsDeleteAllBtn" style="margin-top:14px;">🗑️ حذف كل معلومات الطلاب نهائياً</button>
+    </section>
+
+  </div>
+</div>
+
+<!-- Modal: حذف طالب معين -->
+<div class="modal-overlay hidden" id="deleteOneModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>🗑️ بحث وحذف طالب</h3>
+      <button class="modal-close" id="closeDeleteOneModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" class="form-control modal-search" id="deleteOneSearch" placeholder="ابحث بالاسم أو الكود أو رقم الطالب...">
+      <div id="deleteOneList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: كل الطلاب -->
+<div class="modal-overlay hidden" id="allStudentsModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>📋 كل الطلاب</h3>
+      <button class="modal-close" id="closeAllStudentsModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="text" class="form-control modal-search" id="allStudentsSearch" placeholder="ابحث بالاسم أو الكود...">
+      <div id="allStudentsList"></div>
+    </div>
+  </div>
+</div>
+
+<p class="footer-note">©
+  اداره الموقع:Hamdi Ahmed
+  - 01120584693 - لوحة تحكم الأدمن -
+  <a href="https://www.linkedin.com/" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline;">LinkedIn</a>
+</p>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+
+<!-- QR generate + QR scan libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<!-- بصمة الوجه (Face Recognition) - تعمل بالكامل جوه المتصفح -->
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="js/face.js"></script>
+
+<script src="js/admin.js"></script>
+</body>
+</html>

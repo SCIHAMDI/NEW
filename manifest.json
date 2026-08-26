@@ -1,0 +1,40 @@
+{
+  "id": "/samtr/",
+  "name": "تطبيق سنتر العلا التعليمي",
+  "short_name": "سنتر العلا",
+  "description": "تطبيق سنتر العلا التعليمي لمتابعة درجات وقوائم الطلاب",
+
+  "lang": "ar",
+  "dir": "rtl",
+
+  "start_url": "/samtr/",
+  "scope": "/samtr/",
+
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
+
+  "orientation": "portrait-primary",
+
+  "background_color": "#ffffff",
+  "theme_color": "#3498db",
+
+  "icons": [
+    {
+      "src": "android/launchericon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "android/launchericon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
