@@ -57,6 +57,53 @@ function escapeHtml(str) {
   return String(str ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+/* ==========================================================
+   تجميع المصروفات حسب المادة/المدرس (Billing Groups)
+   ==========================================================
+   لو الطالب مسجل في أكتر من مجموعة لنفس المدرس (مثلاً 3 مواعيد مختلفة عند "محمد نصار")،
+   كل مجموعة دي بتتخزن كـ subject منفصل في student.subjects (subjectKey مختلف لكل واحدة)
+   لكن للفوترة/المصروفات لازم تتحسب كمادة واحدة بس، مش تتكرر مع كل مجموعة.
+   بنجمع حسب teacherId لو موجود (وده الحالة الغالبة)، أو حسب اسم المادة نفسه كـ fallback
+   للمواد اللي اتضافت يدوي من غير ربط بمدرس معين.
+   بيرجع array: [{ billingKey, name, fee, day, time, subjectKeys: [...] }]
+   ========================================================== */
+/* الاسم "الأساسي" للمادة - الجزء اللي قبل أول " - " في الاسم (لو موجود)
+   بيستخدم كـ fallback للتجميع لما مفيش teacherId موثوق فيه (مثلاً مادة اتضافت يدوي
+   بالاسم "كيمياء محمد نصار - 3:00ص" و"كيمياء محمد نصار - 4:00ص" - نفس المدرس فعلياً
+   بس من غير ربط برمجي بمعرّف المدرس) */
+function billingBaseName(name) {
+  if (!name) return "";
+  const idx = name.indexOf(" - ");
+  return idx > -1 ? name.slice(0, idx).trim() : name.trim();
+}
+
+function getBillingGroups(subjectsObj) {
+  const entries = Object.entries(subjectsObj || {});
+  const groups = {};
+  entries.forEach(([key, s]) => {
+    const baseName = billingBaseName(s.name);
+    // إصلاح: نجمع بالأولوية حسب teacherId لو موجود (الأدق)، وإلا حسب "الاسم الأساسي"
+    // للمادة - ده بيغطي حالة إضافة نفس المادة يدوياً أكتر من مرة بأسماء متشابهة بس
+    // بمواعيد مختلفة، من غير ما تكون مربوطة برمجياً بنفس معرّف المدرس (teacherId)
+    const billingKey = s.teacherId ? "t:" + s.teacherId : "n:" + baseName;
+    if (!groups[billingKey]) {
+      groups[billingKey] = { billingKey, name: baseName || s.name, fee: s.fee, day: s.day, time: s.time, subjectKeys: [] };
+    }
+    groups[billingKey].subjectKeys.push(key);
+    // لو فيه فرق بسيط في المصاريف بين المجموعات (نادر لكن احتياطاً)، بناخد أعلى قيمة تجنباً لنقص التحصيل
+    const feeNum = parseFloat(s.fee) || 0;
+    const curFeeNum = parseFloat(groups[billingKey].fee) || 0;
+    if (feeNum > curFeeNum) groups[billingKey].fee = s.fee;
+  });
+  return Object.values(groups);
+}
+
+/* هل مادة/مدرس معين (billing group) مدفوعة لشهر معين؟ - بنعتبرها مدفوعة لو أي مجموعة منها
+   اتسجلت كمدفوعة (احتياطاً للتوافق مع بيانات قديمة كانت بتتسجل مجموعة بمجموعة قبل هذا التحديث) */
+function isBillingGroupPaid(group, monthPayments) {
+  return group.subjectKeys.some((k) => !!(monthPayments || {})[k]);
+}
+
 /* ---------- شهر الدفع الحالي بصيغة 2026-08 ---------- */
 function currentMonthKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;

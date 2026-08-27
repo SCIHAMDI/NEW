@@ -574,11 +574,11 @@ function attachLiveOverviewListeners() {
 }
 
 function isStudentPaidThisMonth(student) {
-  const subjects = Object.entries(student.subjects || {});
-  if (!subjects.length) return { paid: true, unpaidSubjects: [] };
+  const billingGroups = getBillingGroups(student.subjects);
+  if (!billingGroups.length) return { paid: true, unpaidSubjects: [] };
   const monthKey = currentMonthKey();
   const payments = (student.payments || {})[monthKey] || {};
-  const unpaidSubjects = subjects.filter(([key]) => !payments[key]).map(([key, s]) => ({ key, name: s.name }));
+  const unpaidSubjects = billingGroups.filter((g) => !isBillingGroupPaid(g, payments)).map((g) => ({ key: g.billingKey, name: g.name }));
   return { paid: unpaidSubjects.length === 0, unpaidSubjects };
 }
 
@@ -1189,23 +1189,25 @@ async function searchStudentForPayments() {
 
 function renderPaymentSubjects(code, student, monthKey) {
   document.getElementById("pay_monthLabel").textContent = monthLabel(monthKey);
-  const subjects = Object.entries(student.subjects || {});
+  // إصلاح تكرار المطالبة بالدفع: تجميع كل المجموعات التابعة لنفس المدرس كمادة واحدة بس
+  const billingGroups = getBillingGroups(student.subjects);
   const wrap = document.getElementById("pay_subjectsWrap");
   const noSubjects = document.getElementById("pay_noSubjects");
   wrap.innerHTML = "";
 
-  if (!subjects.length) { noSubjects.classList.remove("hidden"); return; }
+  if (!billingGroups.length) { noSubjects.classList.remove("hidden"); return; }
   noSubjects.classList.add("hidden");
 
   const payments = (student.payments || {})[monthKey] || {};
   const isPastMonth = monthKey < currentMonthKey(); // الشهور اللي فاتت تُعرض للمراجعة بس، مش قابلة للتعديل
 
-  subjects.forEach(([key, s]) => {
-    const isPaid = !!payments[key];
+  billingGroups.forEach((g) => {
+    const isPaid = isBillingGroupPaid(g, payments);
     const locked = isPaid || isPastMonth;
+    const groupsCountNote = g.subjectKeys.length > 1 ? ` <span style="color:var(--text-light); font-weight:400;">(${g.subjectKeys.length} مجموعات مربوطة - بتتحسب مرة واحدة)</span>` : "";
     const row = el(`
       <div class="pay-row">
-        <div class="info"><b>${escapeHtml(s.name)}</b>${escapeHtml(s.fee || 0)} جنيه - ${escapeHtml(s.day || "")} ${isPaid ? '<span class="badge success" style="margin-right:6px;">مؤكد ومقفول 🔒</span>' : isPastMonth ? '<span class="badge pending" style="margin-right:6px;">لم يُدفع (شهر سابق)</span>' : ""}</div>
+        <div class="info"><b>${escapeHtml(g.name)}</b>${escapeHtml(g.fee || 0)} جنيه - ${escapeHtml(g.day || "")}${groupsCountNote} ${isPaid ? '<span class="badge success" style="margin-right:6px;">مؤكد ومقفول 🔒</span>' : isPastMonth ? '<span class="badge pending" style="margin-right:6px;">لم يُدفع (شهر سابق)</span>' : ""}</div>
         <div class="pay-toggle">
           <button type="button" class="yes ${isPaid ? "active" : ""}" data-yes ${locked ? "disabled" : ""}>✓</button>
           <button type="button" class="no ${!isPaid ? "active" : ""}" data-no ${locked ? "disabled" : ""}>✗</button>
@@ -1214,12 +1216,15 @@ function renderPaymentSubjects(code, student, monthKey) {
 
     row.querySelector("[data-yes]").addEventListener("click", async () => {
       // قفل نهائي: بمجرد تعليم الصح ما ينفعش يتلغي تاني
-      await db.ref(`students/${code}/payments/${monthKey}/${key}`).set(true);
+      // وبيتطبق على كل المجموعات المرتبطة بنفس المدرس/المادة لنفس الشهر مرة واحدة تلقائياً
+      const updates = {};
+      g.subjectKeys.forEach((k) => (updates[k] = true));
+      await db.ref(`students/${code}/payments/${monthKey}`).update(updates);
       row.querySelector("[data-yes]").classList.add("active");
       row.querySelector("[data-yes]").disabled = true;
       row.querySelector("[data-no]").classList.remove("active");
       row.querySelector("[data-no]").disabled = true;
-      const msg = `تم تأكيد دفع مصاريف "${s.name}" لشهر ${monthLabel(monthKey)} للطالب ${student.name} - Al Ola Center. شكراً لكم.`;
+      const msg = `تم تأكيد دفع مصاريف "${g.name}" لشهر ${monthLabel(monthKey)} للطالب ${student.name} - Al Ola Center. شكراً لكم.`;
       showToast("تم تسجيل الدفع وقفل التأكيد", "success");
       playNotifySound();
       loadOverview();
@@ -1229,7 +1234,9 @@ function renderPaymentSubjects(code, student, monthKey) {
     });
 
     row.querySelector("[data-no]").addEventListener("click", async () => {
-      await db.ref(`students/${code}/payments/${monthKey}/${key}`).remove();
+      const updates = {};
+      g.subjectKeys.forEach((k) => (updates[k] = null));
+      await db.ref(`students/${code}/payments/${monthKey}`).update(updates);
       row.querySelector("[data-no]").classList.add("active");
       row.querySelector("[data-yes]").classList.remove("active");
       showToast("تم تعليم المادة كغير مدفوعة", "success");
@@ -1276,7 +1283,14 @@ async function loadPaymentRequests() {
 
         card.querySelector("[data-approve]").addEventListener("click", async () => {
           const amount = Number(r.amount) || 0; // ضمان إن المبلغ رقم فعلي مش نص، عشان الإجمالي يتحدث صح
-          if (r.subjectKey) await db.ref(`students/${r.code}/payments/${r.month}/${r.subjectKey}`).set(true);
+          // بيدعم subjectKeys (مصفوفة - كل المجموعات المرتبطة بنفس المدرس/المادة) وكمان subjectKey
+          // القديمة (توافقاً مع أي طلبات اتبعتت قبل هذا التحديث)
+          const keysToMark = Array.isArray(r.subjectKeys) && r.subjectKeys.length ? r.subjectKeys : (r.subjectKey ? [r.subjectKey] : []);
+          if (keysToMark.length) {
+            const updates = {};
+            keysToMark.forEach((k) => (updates[k] = true));
+            await db.ref(`students/${r.code}/payments/${r.month}`).update(updates);
+          }
           await db.ref(`paymentRequests/${reqId}`).update({ status: "approved", amount });
           playNotifySound();
           showToast("تم تأكيد الدفع", "success");
@@ -1840,12 +1854,13 @@ async function computeLedgerRows(monthKey) {
   const students = studentsSnap.exists() ? studentsSnap.val() : {};
   Object.values(students).forEach((s) => {
     const payments = (s.payments || {})[monthKey] || {};
-    Object.entries(payments).forEach(([subKey, paid]) => {
-      if (!paid) return;
-      const sub = (s.subjects || {})[subKey];
-      // ضمان تحويل سعر المادة لرقم فعلي (parseFloat) حتى لو اتخزن كنص، عشان الإجمالي يتحدث صح دايماً
-      const amount = sub ? parseFloat(sub.fee) || 0 : 0;
-      rows.push({ student: s.name, subject: sub ? sub.name : "-", amount, type: "عادي" });
+    // إصلاح: نحسب كل مادة/مدرس مرة واحدة بس في السجل (مش مرة لكل مجموعة مرتبطة بنفس المدرس)
+    // وإلا هيتكرر نفس المبلغ 2 أو 3 مرات لو الطالب مسجل في أكتر من مجموعة لنفس المدرس
+    const billingGroups = getBillingGroups(s.subjects);
+    billingGroups.forEach((g) => {
+      if (!isBillingGroupPaid(g, payments)) return;
+      const amount = parseFloat(g.fee) || 0;
+      rows.push({ student: s.name, subject: g.name, amount, type: "عادي" });
     });
   });
   const reqSnap = await db.ref("paymentRequests").get();

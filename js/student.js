@@ -295,22 +295,23 @@ function renderAll(student, code) {
   // ---------- Expenses tab ----------
   const monthKey = currentMonthKey();
   const monthPayments = (student.payments || {})[monthKey] || {};
-  const subjectEntries = Object.entries(student.subjects || {});
-  const totalFees = subjectEntries.reduce((sum, [, s]) => sum + Number(s.fee || 0), 0);
-  const paidCount = subjectEntries.filter(([key]) => monthPayments[key]).length;
+  // إصلاح تكرار المصروفات: تجميع المجموعات المتعددة لنفس المدرس كمادة واحدة بس للفوترة
+  const billingGroups = getBillingGroups(student.subjects);
+  const totalFees = billingGroups.reduce((sum, g) => sum + (parseFloat(g.fee) || 0), 0);
+  const paidCount = billingGroups.filter((g) => isBillingGroupPaid(g, monthPayments)).length;
 
   document.getElementById("ex_total").textContent = totalFees + " ج";
-  document.getElementById("ex_paidCount").textContent = paidCount + " / " + subjectEntries.length;
-  document.getElementById("ex_subjectsCount").textContent = subjectEntries.length;
+  document.getElementById("ex_paidCount").textContent = paidCount + " / " + billingGroups.length;
+  document.getElementById("ex_subjectsCount").textContent = billingGroups.length;
 
   const statusWrap = document.getElementById("ex_subjectsStatus");
-  if (!subjectEntries.length) {
+  if (!billingGroups.length) {
     statusWrap.innerHTML = '<p class="empty-box">لا توجد مواد مسجلة</p>';
   } else {
-    statusWrap.innerHTML = subjectEntries
-      .map(([key, s]) => {
-        const isPaid = !!monthPayments[key];
-        return `<div class="pay-row"><div class="info"><b>${escapeHtml(s.name)}</b>${escapeHtml(s.fee || 0)} جنيه</div><span class="badge ${isPaid ? "success" : "danger"}">${isPaid ? "مدفوع ✓" : "غير مدفوع ✗"}</span></div>`;
+    statusWrap.innerHTML = billingGroups
+      .map((g) => {
+        const isPaid = isBillingGroupPaid(g, monthPayments);
+        return `<div class="pay-row"><div class="info"><b>${escapeHtml(g.name)}</b>${escapeHtml(g.fee || 0)} جنيه</div><span class="badge ${isPaid ? "success" : "danger"}">${isPaid ? "مدفوع ✓" : "غير مدفوع ✗"}</span></div>`;
       })
       .join("");
   }
@@ -335,12 +336,12 @@ function renderAll(student, code) {
   }
 
   // ---------- Payment modal setup ----------
-  setupPayModal(student, code, subjectEntries);
+  setupPayModal(student, code, billingGroups);
 }
 
-function setupPayModal(student, code, subjectEntries) {
+function setupPayModal(student, code, billingGroups) {
   const select = document.getElementById("pf_subject");
-  select.innerHTML = subjectEntries.map(([key, s]) => `<option value="${key}" data-fee="${s.fee || 0}" data-name="${escapeHtml(s.name)}">${escapeHtml(s.name)} (${s.fee || 0} ج)</option>`).join("");
+  select.innerHTML = billingGroups.map((g) => `<option value="${g.billingKey}" data-fee="${g.fee || 0}" data-name="${escapeHtml(g.name)}" data-keys="${g.subjectKeys.join(",")}">${escapeHtml(g.name)} (${g.fee || 0} ج)</option>`).join("");
   select.addEventListener("change", () => {
     const opt = select.selectedOptions[0];
     if (opt) document.getElementById("pf_amount").value = opt.dataset.fee || "";
@@ -394,7 +395,7 @@ document.getElementById("payForm").addEventListener("submit", async (e) => {
     await db.ref("paymentRequests").push({
       code: currentCode,
       name: currentStudent.name,
-      subjectKey: opt.value,
+      subjectKeys: (opt.dataset.keys || "").split(",").filter(Boolean), // كل مفاتيح المجموعات المرتبطة بنفس المدرس/المادة
       subjectName: opt.dataset.name,
       amount: document.getElementById("pf_amount").value,
       phone: document.getElementById("pf_phone").value.trim(),
