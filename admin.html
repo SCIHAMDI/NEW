@@ -130,6 +130,7 @@
           <p style="font-size:13px; color:var(--text-mid); margin:10px 0;">رابط بروفايل الطالب:</p>
           <input class="form-control" id="resultLink" readonly style="text-align:center; font-size:12.5px; margin-bottom:16px;">
           <div id="resultQr" style="display:flex; justify-content:center;"></div>
+          <button type="button" class="btn btn-primary" id="c_printCardBtn" style="margin-top:16px;">🪪 عرض وطباعة كارت الطالب</button>
         </div>
       </div>
     </section>
@@ -242,6 +243,7 @@
           <p style="font-size:13.5px; color:var(--text-mid); font-weight:700; margin-bottom:8px;">كود الطالب و QR الخاص به</p>
           <p style="font-size:24px; font-weight:800; color:var(--purple-dark);" id="e_codeDisplay"></p>
           <div id="e_qrDisplay" style="display:flex; justify-content:center; margin-top:8px;"></div>
+          <button type="button" class="btn btn-primary" id="e_printCardBtn" style="margin-top:14px;">🪪 عرض وطباعة كارت الطالب</button>
         </div>
       </div>
 
@@ -339,9 +341,10 @@
         القائمة دي بتتجدد تلقائياً كل يوم. الطالب اللي معاه مجموعة واحدة بيتحسب غايب لو فات معاده بـ 15 دقيقة، ولو معاه أكتر من مجموعة لنفس المدرس في نفس اليوم بينتظر النظام لحد آخر معاد ليه.
         إرسال الواتساب هنا بضغطة واحدة (المتصفح لا يسمح بإرسال تلقائي 100% بدون تدخل بسبب سياسات النوافذ المنبثقة - التفاصيل في README).
       </p>
-      <div style="display:flex; gap:10px; margin-bottom:14px;">
+      <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
         <button class="btn btn-outline" id="ab_refreshBtn">🔄 تحديث القائمة</button>
         <button class="btn btn-primary" id="ab_sendAllBtn">📱 إرسال تنبيه للكل (واحد تلو الآخر)</button>
+        <button class="btn btn-danger" id="ab_deleteAllBtn">🗑️ حذف الكل</button>
       </div>
       <div id="absenteesList"></div>
       <p class="empty-box hidden" id="absenteesEmpty">لا يوجد غائبين مسجلين حتى الآن اليوم 👍</p>
@@ -519,6 +522,29 @@
         </div>
       </div>
 
+      <div class="panel-title" style="font-size:14px;">🪪 بيانات كارت الطالب (وجه الكارت)</div>
+      <div class="row-2" style="margin-bottom:10px;">
+        <div class="form-group">
+          <label>اسم الإدارة الظاهر على الكارت</label>
+          <input type="text" class="form-control" id="settingsCardManagerName" placeholder="أ/ أحمد جمال عمر">
+        </div>
+        <div class="form-group">
+          <label>العنوان الظاهر على الكارت</label>
+          <input type="text" class="form-control" id="settingsCardAddress" placeholder="سنتر العلا فى الجديدة">
+        </div>
+      </div>
+      <div class="row-2" style="margin-bottom:14px;">
+        <div class="form-group">
+          <label>رقم تواصل 1</label>
+          <input type="text" class="form-control" id="settingsCardPhone1" placeholder="01143229861">
+        </div>
+        <div class="form-group">
+          <label>رقم تواصل 2 (واتساب)</label>
+          <input type="text" class="form-control" id="settingsCardPhone2" placeholder="01154782444">
+        </div>
+      </div>
+      <button class="btn btn-primary" id="settingsSaveCardInfoBtn" style="margin-bottom:26px;">💾 حفظ بيانات الكارت</button>
+
       <div class="panel-title" style="font-size:14px;">📱 أتمتة إرسال الواتساب</div>
       <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:12px;">
         المتصفح وحده مينفعش يبعت واتساب 100% بدون تدخل بشري (قيد تقني من واتساب نفسه). لو عايز أتمتة حقيقية بالكامل من غير ما تفتح أي نافذة خالص، اربط رابط API خارجي (Make.com / Zapier / سيرفر Twilio خاص بيك) وهنبعتله كل رسالة أوتوماتيك في الخلفية.
@@ -580,9 +606,92 @@
           <button class="btn btn-outline btn-block" id="settingsOpenDeleteOneBtn">🔍 بحث وحذف طالب</button>
         </div>
       </div>
-      <button class="btn btn-danger btn-block" id="settingsDeleteAllBtn" style="margin-top:14px;">🗑️ حذف كل معلومات الطلاب نهائياً</button>
+      <button class="btn btn-danger btn-block" id="settingsDeleteAllBtn" style="margin-top:14px;">🗑️ حذف شامل لكل بيانات النظام (إعادة ضبط المصنع)</button>
     </section>
 
+  </div>
+</div>
+
+<!-- Modal: حذف شامل / إعادة ضبط المصنع -->
+<div class="modal-overlay hidden" id="factoryResetModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>⚠️ حذف شامل لكل بيانات النظام</h3>
+      <button class="modal-close" id="closeFactoryResetModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-weight:800; color:var(--pink); margin-bottom:10px;">تحذير: العملية دي نهائية ومفيش رجوع فيها إطلاقاً.</p>
+      <p style="font-size:13px; color:var(--text-mid); margin-bottom:10px;">هيتم حذف كل حاجة نهائياً والرجوع بالموقع لحالته الأولى تماماً وكأنه لسه اتفتح لأول مرة، بما في ذلك:</p>
+      <ul style="font-size:13px; color:var(--text-mid); margin-bottom:16px; padding-right:18px; line-height:1.9;">
+        <li>كل بيانات الطلاب (البروفايلات، الدرجات، الحضور، المصروفات، الملاحظات، بصمات الوجه)</li>
+        <li>كل المدرسين والمجموعات</li>
+        <li>قوائم الغائبين المسجلة بكل تاريخ</li>
+        <li>طلبات الدفع الأونلاين وسجل المصاريف وأرشيفه الشهري</li>
+        <li>محادثات الشكاوى والاستفسارات</li>
+        <li>إحصائيات الزيارات وعداد "متصلين الآن"</li>
+      </ul>
+      <p style="font-size:12px; color:var(--text-light); margin-bottom:14px;">ملحوظة: إعدادات الثيم والألوان واللوجو وإعدادات الواتساب هتفضل زي ما هي (مش بيانات طلاب).</p>
+      <p style="font-size:13px; margin-bottom:8px;">للتأكيد، اكتب كلمة <b>حذف</b> بالظبط في الخانة تحت:</p>
+      <input type="text" class="form-control" id="factoryResetConfirmInput" placeholder="اكتب: حذف">
+      <button class="btn btn-danger btn-block" id="factoryResetConfirmBtn" style="margin-top:14px;" disabled>🗑️ تأكيد الحذف الشامل نهائياً</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: كارت الطالب (وجه وظهر) للطباعة -->
+<div class="modal-overlay hidden" id="studentCardModal">
+  <div class="modal-box" style="max-width:760px;">
+    <div class="modal-head">
+      <h3>🪪 كارت الطالب</h3>
+      <button class="modal-close" id="closeStudentCardModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="id-card-preview-wrap">
+        <div id="studentCardPrintArea" class="id-card-print-area">
+          <div class="id-card id-card-front">
+            <div class="id-card-logo-wrap">
+              <div class="id-card-logo theme-logo-slot"></div>
+              <div class="id-card-brand">
+                <span class="ar">سنتر العلا</span>
+                <span class="sub">التعليمي</span>
+              </div>
+            </div>
+            <div class="id-card-admin-box">
+              <span class="lbl">إدارة:</span>
+              <span class="name" id="card_managerName">أ/ أحمد جمال عمر</span>
+            </div>
+            <div class="id-card-phones">
+              <span id="card_phone1">01143229861</span>
+              <span class="dot">📞</span>
+              <span id="card_phone2">01154782444</span>
+            </div>
+            <div class="id-card-address"><span id="card_address">سنتر العلا فى الجديدة</span></div>
+          </div>
+
+          <div class="id-card id-card-back">
+            <div class="id-card-student-info">
+              <div><span class="lbl">الاسم :</span> <span id="card_name">-</span></div>
+              <div><span class="lbl">الصف :</span> <span id="card_grade">-</span></div>
+            </div>
+            <ul class="id-card-rules">
+              <li>ممنوع حضور الطالب بدون هذا الكارت</li>
+              <li>يتم الاستعلام والتعرف على حالة الطالب عن طريق هذا الكارت</li>
+              <li>يتم إبلاغ الإدارة في حالة فقدان الكارت</li>
+            </ul>
+            <div class="id-card-codes">
+              <div class="id-card-qr" id="card_qr"></div>
+              <div class="id-card-barcode-wrap">
+                <div class="id-card-barcode-label">كود الطالب</div>
+                <svg id="card_barcode"></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p style="font-size:11.5px; color:var(--text-mid); text-align:center; margin-top:14px;">لو عايز اللوجو الحقيقي يظهر بدل الاسم النصي، ارفعه من تبويب الإعدادات → "لوجو لوحة الأدمن"</p>
+      <button type="button" class="btn btn-primary btn-block" id="printStudentCardBtn" style="margin-top:10px;">🖨️ طباعة الكارت (وجه وظهر)</button>
+    </div>
   </div>
 </div>
 
@@ -631,6 +740,7 @@
 <!-- QR generate + QR scan libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
 
 <!-- بصمة الوجه (Face Recognition) - تعمل بالكامل جوه المتصفح -->
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>

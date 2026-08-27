@@ -62,12 +62,8 @@ function attachBadgeListeners() {
     updateTabBadge("payments", pending);
   });
 
-  // شارة "الغائبين": عدد الطلاب اللي لسه ما اتبعتلهمش تنبيه اليوم
-  db.ref("absentees/" + todayKey()).on("value", (snap) => {
-    const all = snap.exists() ? snap.val() : {};
-    const notSent = Object.values(all).filter((a) => a && a.status !== "sent").length;
-    updateTabBadge("absentees", notSent);
-  });
+  // شارة "الغائبين": بيتحدث من نفس الاشتراك المباشر في absenteesListenerRef (attachAbsenteesListener)
+  // اللي بيتنقل تلقائياً لمسار اليوم الجديد كل 24 ساعة - شوف renderAbsenteesList()
 
   // شارة "الشكاوى والاستفسارات": عدد المحادثات اللي آخر رسالة فيها من الطالب (لسه محتاجة رد)
   db.ref("supportChats").on("value", (snap) => {
@@ -407,6 +403,7 @@ document.getElementById("addSubjectBtn").addEventListener("click", () => addSubj
 /* ---------- بصمة الوجه: إنشاء طالب جديد ---------- */
 let c_faceStream = null;
 let capturedFaceDescriptor = null;
+let c_lastCreated = null; // آخر طالب اتعمله حساب - لزرار "عرض وطباعة كارت الطالب"
 
 document.getElementById("c_startFaceCamBtn").addEventListener("click", async () => {
   const status = document.getElementById("c_faceStatus");
@@ -476,6 +473,7 @@ document.getElementById("createForm").addEventListener("submit", async (e) => {
     new QRCode(qrBox, { text: link, width: 170, height: 170 });
 
     document.getElementById("createResult").classList.remove("hidden");
+    c_lastCreated = { code, name, grade }; // لزرار "عرض وطباعة كارت الطالب"
     document.getElementById("createForm").reset();
     subjectsWrap.innerHTML = "";
     addSubjectRow(subjectsWrap);
@@ -690,6 +688,7 @@ function renderGradesTable(grades) {
    TAB: تعديل بروفايل طالب
    ========================================================== */
 let e_currentCode = null;
+let e_currentStudent = null; // لزرار "عرض وطباعة كارت الطالب"
 let e_faceStream = null;
 let e_capturedFaceDescriptor = null;
 const e_subjectsWrap = document.getElementById("e_subjectsWrap");
@@ -736,6 +735,7 @@ async function searchStudentForEdit() {
   }
   const student = snap.val();
   e_currentCode = code;
+  e_currentStudent = student;
 
   document.getElementById("e_name").value = student.name || "";
   document.getElementById("e_grade").value = student.grade || "";
@@ -806,6 +806,55 @@ document.getElementById("e_deleteBtn").addEventListener("click", async () => {
     showToast("حدث خطأ أثناء الحذف: " + err.message, "error");
   }
 });
+
+/* ==========================================================
+   كارت الطالب (ID Card) - وجه وظهر جاهز للطباعة
+   ========================================================== */
+async function openStudentCard(code, name, grade) {
+  document.getElementById("card_name").textContent = name || "-";
+  document.getElementById("card_grade").textContent = grade || "-";
+
+  // بيانات الإدارة/التواصل - قابلة للتعديل من الإعدادات، ولها قيم افتراضية جاهزة
+  try {
+    const snap = await db.ref("settings/systemConfig").get();
+    const cfg = snap.exists() ? snap.val() : {};
+    document.getElementById("card_managerName").textContent = cfg.cardManagerName || "أ/ أحمد جمال عمر";
+    document.getElementById("card_phone1").textContent = cfg.cardPhone1 || "01143229861";
+    document.getElementById("card_phone2").textContent = cfg.cardPhone2 || "01154782444";
+    document.getElementById("card_address").textContent = cfg.cardAddress || "سنتر العلا فى الجديدة";
+  } catch (e) { /* هتفضل شغالة بالقيم الافتراضية */ }
+
+  // QR بيوديك لبروفايل الطالب مباشرة
+  const qrBox = document.getElementById("card_qr");
+  qrBox.innerHTML = "";
+  new QRCode(qrBox, { text: SITE_BASE_URL + "student.html?id=" + code, width: 130, height: 130 });
+
+  // باركود شريطي بكود الطالب، محاط بنجمتين زي الكارت الأصلي (تلقائي مع تنسيق CODE39)
+  try {
+    JsBarcode("#card_barcode", code, {
+      format: "CODE39", displayValue: true, font: "monospace",
+      fontSize: 13, textMargin: 2, height: 34, width: 1.8, margin: 4,
+    });
+  } catch (e) { console.error("فشل توليد الباركود:", e); }
+
+  document.getElementById("studentCardModal").classList.remove("hidden");
+}
+
+document.getElementById("c_printCardBtn").addEventListener("click", () => {
+  if (!c_lastCreated) return;
+  openStudentCard(c_lastCreated.code, c_lastCreated.name, c_lastCreated.grade);
+});
+
+document.getElementById("e_printCardBtn").addEventListener("click", () => {
+  if (!e_currentCode) return;
+  openStudentCard(e_currentCode, document.getElementById("e_name").value, document.getElementById("e_grade").value);
+});
+
+document.getElementById("closeStudentCardModal").addEventListener("click", () => {
+  document.getElementById("studentCardModal").classList.add("hidden");
+});
+
+document.getElementById("printStudentCardBtn").addEventListener("click", () => window.print());
 
 /* ==========================================================
    TAB: الحضور والانصراف (يدوي / باركود / كاميرا) - ذكي بالمعاد والدفع
@@ -991,6 +1040,8 @@ async function proceedAttendance(code, student, resultBox) {
     type = "in";
     message = `مرحباً، تم تسجيل حضور الطالب ${student.name} اليوم الساعة ${timeStr} - Al Ola Center`;
     resultBox.className = "scan-result in";
+    // بمجرد ما الطالب يسجل حضوره (بأي طريقة: كود، باركود، أو بصمة وجه)، يتشال فوراً من قائمة الغائبين اليوم
+    db.ref(`absentees/${today}/${code}`).remove().catch(() => {});
   } else {
     const [key] = openIn;
     await db.ref(`students/${code}/attendance/${key}`).update({ checkedOut: true, outTime: timeStr });
@@ -1470,26 +1521,46 @@ async function detectAndLogAbsentees() {
 
 function startAutoAbsenceChecker() {
   detectAndLogAbsentees();
+  attachAbsenteesListener(); // اشتراك مباشر (realtime) في قائمة اليوم - تحديث فوري بدون أي تدخل يدوي
   // فحص دوري كل دقيقة طول ما لوحة الأدمن مفتوحة (زي ما موضح في README، الإرسال الآلي 100%
   // بدون فتح لوحة الأدمن محتاج سيرفر خلفي / Cloud Functions، مش متاح في موقع static عادي)
   setInterval(() => {
-    detectAndLogAbsentees().then(() => {
-      const absTab = document.getElementById("tab-absentees");
-      if (absTab && !absTab.classList.contains("hidden")) refreshAbsenteesList();
-      loadOverview();
-    });
+    attachAbsenteesListener(); // بيتحقق لو اليوم اتغيّر (تجديد تلقائي للقائمة كل 24 ساعة) ويحوّل الاشتراك لليوم الجديد
+    detectAndLogAbsentees().then(() => loadOverview());
   }, 60000);
 }
 
-async function refreshAbsenteesList() {
+/* إصلاح/تطوير: بدل ما القائمة تتحدث بس لما تفتح التاب أو تضغط تحديث، بقت مشتركة (realtime listener)
+   في مسار اليوم الحالي مباشرة - أي تغيير (تسجيل غياب جديد، حذف، تأكيد إرسال) بيظهر فوراً بدون أي تدخل.
+   وبما إن المسار مبني على تاريخ اليوم (absentees/{today})، ساعة ما اليوم يتغيّر (كل 24 ساعة) بيتم
+   تلقائياً تحويل الاشتراك لمسار اليوم الجديد (فاضي) - وده هو "التحديث التلقائي كل 24 ساعة" المطلوب. */
+let absenteesListenerDate = null;
+let absenteesListenerRef = null;
+
+function attachAbsenteesListener() {
   const today = todayKey();
-  await detectAndLogAbsentees();
-  const snap = await db.ref("absentees/" + today).get();
-  absenteesCache = snap.exists() ? snap.val() : {};
+  if (absenteesListenerDate === today) return; // مشترك في نفس يوم النهاردة أصلاً
+  if (absenteesListenerRef) absenteesListenerRef.off();
+  absenteesListenerDate = today;
+  absenteesListenerRef = db.ref("absentees/" + today);
+  absenteesListenerRef.on("value", (snap) => {
+    absenteesCache = snap.exists() ? snap.val() : {};
+    renderAbsenteesList();
+  });
+}
+
+async function refreshAbsenteesList() {
+  attachAbsenteesListener();
+  await detectAndLogAbsentees(); // فحص فوري لأي غياب جديد - القائمة هترندر نفسها تلقائياً عبر الـ listener
+}
+
+function renderAbsenteesList() {
+  const today = todayKey();
   const wrap = document.getElementById("absenteesList");
   const empty = document.getElementById("absenteesEmpty");
   wrap.innerHTML = "";
   const entries = Object.entries(absenteesCache);
+  updateTabBadge("absentees", entries.filter(([, a]) => a && a.status !== "sent").length);
   if (!entries.length) { empty.classList.remove("hidden"); return; }
   empty.classList.add("hidden");
 
@@ -1506,14 +1577,12 @@ async function refreshAbsenteesList() {
       const msg = `تنبيه غياب: الطالب ${a.name} لم يحضر معاده اليوم (${a.time}) في Al Ola Center`;
       sendWhatsApp(a.phone, msg);
       await db.ref(`absentees/${today}/${code}/status`).set("sent");
-      refreshAbsenteesList();
     });
     const delBtn = el(`<button class="btn btn-outline" title="حذف من قائمة الغائبين اليوم" style="margin-right:6px;">🗑️</button>`);
     delBtn.addEventListener("click", async () => {
       if (!confirm(`تأكيد حذف ${a.name} من قائمة الغائبين اليوم؟`)) return;
       await db.ref(`absentees/${today}/${code}`).remove();
       showToast("تم حذف السجل من قائمة الغائبين", "success");
-      refreshAbsenteesList();
     });
     row.lastElementChild.appendChild(btn);
     row.lastElementChild.appendChild(delBtn);
@@ -1532,7 +1601,14 @@ document.getElementById("ab_sendAllBtn").addEventListener("click", async () => {
     sendWhatsApp(a.phone, msg);
     await db.ref(`absentees/${today}/${code}/status`).set("sent");
   }
-  refreshAbsenteesList();
+});
+document.getElementById("ab_deleteAllBtn").addEventListener("click", async () => {
+  const today = todayKey();
+  const count = Object.keys(absenteesCache).length;
+  if (!count) return showToast("قائمة الغائبين فاضية أصلاً", "success");
+  if (!confirm(`تأكيد حذف كل قائمة الغائبين اليوم (${count} طالب)؟ الحذف نهائي.`)) return;
+  await db.ref(`absentees/${today}`).remove();
+  showToast("تم حذف كل قائمة الغائبين لليوم", "success");
 });
 
 /* ==========================================================
@@ -1614,6 +1690,10 @@ async function loadSettingsPanel() {
   document.getElementById("settingsStudentOpacityVal").textContent = document.getElementById("settingsStudentOpacity").value;
   document.getElementById("settingsDisableAutoPopup").checked = !!waS.disableAutoPopup;
   document.getElementById("settingsWebhookUrl").value = waS.webhookUrl || "";
+  document.getElementById("settingsCardManagerName").value = waS.cardManagerName || "أ/ أحمد جمال عمر";
+  document.getElementById("settingsCardAddress").value = waS.cardAddress || "سنتر العلا فى الجديدة";
+  document.getElementById("settingsCardPhone1").value = waS.cardPhone1 || "01143229861";
+  document.getElementById("settingsCardPhone2").value = waS.cardPhone2 || "01154782444";
   highlightLangButtons(adminS.lang || "ar");
 }
 
@@ -1632,6 +1712,18 @@ document.getElementById("settingsSaveWaBtn").addEventListener("click", async () 
       webhookUrl: document.getElementById("settingsWebhookUrl").value.trim(),
     });
     showToast("تم حفظ إعدادات الواتساب", "success");
+  } catch (err) { showToast("حدث خطأ: " + err.message, "error"); }
+});
+
+document.getElementById("settingsSaveCardInfoBtn").addEventListener("click", async () => {
+  try {
+    await db.ref("settings/systemConfig").update({
+      cardManagerName: document.getElementById("settingsCardManagerName").value.trim(),
+      cardAddress: document.getElementById("settingsCardAddress").value.trim(),
+      cardPhone1: document.getElementById("settingsCardPhone1").value.trim(),
+      cardPhone2: document.getElementById("settingsCardPhone2").value.trim(),
+    });
+    showToast("تم حفظ بيانات الكارت", "success");
   } catch (err) { showToast("حدث خطأ: " + err.message, "error"); }
 });
 
@@ -1830,14 +1922,44 @@ document.getElementById("settingsGenTestBtn").addEventListener("click", async ()
   } finally { btn.disabled = false; }
 });
 
-document.getElementById("settingsDeleteAllBtn").addEventListener("click", async () => {
-  if (!confirm("⚠️ هل أنت متأكد؟ هيتم حذف كل بيانات الطلاب نهائياً ولا يمكن التراجع!")) return;
-  if (!confirm("تأكيد نهائي وأخير: متأكد إنك عايز تكمل الحذف؟")) return;
+document.getElementById("settingsDeleteAllBtn").addEventListener("click", () => {
+  document.getElementById("factoryResetConfirmInput").value = "";
+  document.getElementById("factoryResetConfirmBtn").disabled = true;
+  document.getElementById("factoryResetModal").classList.remove("hidden");
+});
+document.getElementById("closeFactoryResetModal").addEventListener("click", () => {
+  document.getElementById("factoryResetModal").classList.add("hidden");
+});
+document.getElementById("factoryResetConfirmInput").addEventListener("input", (e) => {
+  document.getElementById("factoryResetConfirmBtn").disabled = e.target.value.trim() !== "حذف";
+});
+document.getElementById("factoryResetConfirmBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("factoryResetConfirmBtn");
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.innerHTML = '<span class="spin"></span> جاري الحذف الشامل...';
   try {
-    await db.ref("students").remove();
-    showToast("تم حذف كل بيانات الطلاب", "success");
+    // حذف شامل لكل بيانات النظام (مش بس الطلاب) عشان الموقع يرجع لحالته الأولى تماماً
+    await Promise.all([
+      db.ref("students").remove(),
+      db.ref("teachers").remove(),
+      db.ref("absentees").remove(),
+      db.ref("paymentRequests").remove(),
+      db.ref("financeArchive").remove(),
+      db.ref("supportChats").remove(),
+      db.ref("stats").remove(),
+      db.ref("presence").remove(),
+    ]);
+    showToast("تم حذف كل بيانات النظام - الموقع رجع لحالته الأولى", "success");
+    document.getElementById("factoryResetModal").classList.add("hidden");
+    studentsCache = {};
+    absenteesCache = {};
     loadOverview();
-  } catch (err) { showToast("حدث خطأ: " + err.message, "error"); }
+  } catch (err) {
+    showToast("حدث خطأ أثناء الحذف: " + err.message, "error");
+  } finally {
+    btn.textContent = originalText;
+  }
 });
 
 document.getElementById("settingsOpenDeleteOneBtn").addEventListener("click", async () => {
