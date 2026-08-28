@@ -592,7 +592,28 @@
       </div>
       <div id="ledgerArchiveResult" style="margin-top:10px;"></div>
 
-      <div class="panel-title" style="font-size:14px; margin-top:26px; color:var(--pink);">⚠️ أدوات إدارية حساسة</div>
+      <div class="panel-title" style="font-size:14px; margin-top:26px;">📤 إدارة البيانات والتصدير</div>
+      <p style="font-size:12.5px; color:var(--text-mid); margin-bottom:14px;">
+        تصدير تقرير شامل بكل بيانات النظام (للقراءة والطباعة)، أو نسخة احتياطية كاملة (لنقل/استعادة قاعدة البيانات بالكامل).
+      </p>
+      <div class="row-2" style="margin-bottom:10px;">
+        <button class="btn btn-outline" id="exportPdfReportBtn">📄 تصدير كافة البيانات (PDF)</button>
+        <button class="btn btn-outline" id="exportJsonBackupBtn">💾 تصدير نسخة احتياطية كاملة (JSON)</button>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label>استعادة نسخة احتياطية (رفع ملف JSON)</label>
+        <input type="file" accept="application/json" class="form-control" id="importJsonBackupInput">
+      </div>
+      <p style="font-size:11px; color:var(--text-light); margin-top:6px; margin-bottom:20px;">⚠️ الاستعادة بتستبدل بيانات النظام الحالية بمحتوى الملف المرفوع (لكل قسم موجود فيه) - هتظهرلك نافذة تأكيد قبل التنفيذ.</p>
+
+      <div class="panel-title" style="font-size:13px;">📦 النسخ الاحتياطية المحفوظة على النظام</div>
+      <p style="font-size:11.5px; color:var(--text-mid); margin-bottom:10px;">
+        كل مرة تضغط "تصدير نسخة احتياطية كاملة"، بيتحفظ نسخة منها هنا كمان تلقائياً (آخر 5 نسخ فقط)، عشان لو مش لاقي الملف اللي نزّلته تقدر تسترجع من هنا مباشرة من غير رفع أي ملف.
+      </p>
+      <div id="savedBackupsList" style="margin-bottom:26px;"></div>
+      <p class="empty-box hidden" id="savedBackupsEmpty" style="margin-bottom:26px;">لا توجد نسخ احتياطية محفوظة على النظام بعد - اعمل أول نسخة بزرار "تصدير نسخة احتياطية كاملة" فوق</p>
+
+      <div class="panel-title" style="font-size:14px; color:var(--pink);">⚠️ أدوات إدارية حساسة</div>
       <div class="row-2" style="margin-bottom:10px;">
         <div class="form-group" style="margin-bottom:0;">
           <label>إنشاء حسابات وهمية للاختبار</label>
@@ -629,11 +650,45 @@
         <li>طلبات الدفع الأونلاين وسجل المصاريف وأرشيفه الشهري</li>
         <li>محادثات الشكاوى والاستفسارات</li>
         <li>إحصائيات الزيارات وعداد "متصلين الآن"</li>
+        <li>النسخ الاحتياطية المحفوظة داخل النظام (تبويب "إدارة البيانات والتصدير")</li>
       </ul>
-      <p style="font-size:12px; color:var(--text-light); margin-bottom:14px;">ملحوظة: إعدادات الثيم والألوان واللوجو وإعدادات الواتساب هتفضل زي ما هي (مش بيانات طلاب).</p>
+      <p style="font-size:12px; color:var(--text-light); margin-bottom:14px;">ملحوظة: إعدادات الثيم والألوان واللوجو وإعدادات الواتساب هتفضل زي ما هي (مش بيانات طلاب). ⚠️ لو عايز ترجع بعد الحذف، لازم يكون عندك ملف JSON نزّلته من زرار "تصدير نسخة احتياطية" محفوظ على جهازك من قبل - وترفعه من "استعادة نسخة احتياطية" بعد كده.</p>
       <p style="font-size:13px; margin-bottom:8px;">للتأكيد، اكتب كلمة <b>حذف</b> بالظبط في الخانة تحت:</p>
       <input type="text" class="form-control" id="factoryResetConfirmInput" placeholder="اكتب: حذف">
       <button class="btn btn-danger btn-block" id="factoryResetConfirmBtn" style="margin-top:14px;" disabled>🗑️ تأكيد الحذف الشامل نهائياً</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: تقرير شامل بكل البيانات (للطباعة كـ PDF) -->
+<div class="modal-overlay hidden" id="fullReportModal">
+  <div class="modal-box" style="max-width:900px;">
+    <div class="modal-head">
+      <h3>📄 تقرير شامل بكل بيانات النظام</h3>
+      <button class="modal-close" id="closeFullReportModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px; color:var(--text-mid); margin-bottom:12px;">اضغط "طباعة / حفظ PDF" وبعدين اختار "Save as PDF" من نافذة الطباعة اللي هتظهر في المتصفح.</p>
+      <div id="fullReportPrintArea" class="report-print-area"></div>
+      <button type="button" class="btn btn-primary btn-block" id="printFullReportBtn" style="margin-top:16px;">🖨️ طباعة / حفظ PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: تأكيد استعادة نسخة احتياطية -->
+<div class="modal-overlay hidden" id="importBackupModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>⚠️ تأكيد استعادة نسخة احتياطية</h3>
+      <button class="modal-close" id="closeImportBackupModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-weight:800; color:var(--pink); margin-bottom:10px;">تحذير: العملية دي هتستبدل البيانات الحالية بمحتوى الملف نهائياً.</p>
+      <p style="font-size:13px; color:var(--text-mid); margin-bottom:10px;">الأقسام الموجودة في الملف المرفوع وهيتم استبدالها بالكامل:</p>
+      <ul id="importBackupSectionsList" style="font-size:13px; color:var(--text-mid); margin-bottom:16px; padding-right:18px; line-height:1.9;"></ul>
+      <p style="font-size:13px; margin-bottom:8px;">للتأكيد، اكتب كلمة <b>استعادة</b> بالظبط في الخانة تحت:</p>
+      <input type="text" class="form-control" id="importBackupConfirmInput" placeholder="اكتب: استعادة">
+      <button class="btn btn-danger btn-block" id="importBackupConfirmBtn" style="margin-top:14px;" disabled>♻️ تأكيد الاستعادة نهائياً</button>
     </div>
   </div>
 </div>
@@ -745,6 +800,7 @@
 <!-- بصمة الوجه (Face Recognition) - تعمل بالكامل جوه المتصفح -->
 <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
 <script src="js/face.js"></script>
+<script src="js/data-export.js"></script>
 
 <script src="js/admin.js"></script>
 </body>

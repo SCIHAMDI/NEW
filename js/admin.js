@@ -29,7 +29,7 @@ tabs.forEach((tab) => {
     if (tab.dataset.tab === "groups") loadGroupsOverview();
     if (tab.dataset.tab === "absentees") refreshAbsenteesList();
     if (tab.dataset.tab === "support") loadSupportInbox();
-    if (tab.dataset.tab === "settings") { loadSettingsPanel(); loadFinanceLedger(); }
+    if (tab.dataset.tab === "settings") { loadSettingsPanel(); loadFinanceLedger(); loadSavedBackupsList(); }
   });
 });
 
@@ -854,7 +854,9 @@ document.getElementById("closeStudentCardModal").addEventListener("click", () =>
   document.getElementById("studentCardModal").classList.add("hidden");
 });
 
-document.getElementById("printStudentCardBtn").addEventListener("click", () => window.print());
+document.getElementById("printStudentCardBtn").addEventListener("click", () => {
+  printWithPageSize("print-id-card", "85.6mm 53.9mm", "0");
+});
 
 /* ==========================================================
    TAB: الحضور والانصراف (يدوي / باركود / كاميرا) - ذكي بالمعاد والدفع
@@ -1964,6 +1966,7 @@ document.getElementById("factoryResetConfirmBtn").addEventListener("click", asyn
       db.ref("supportChats").remove(),
       db.ref("stats").remove(),
       db.ref("presence").remove(),
+      db.ref("systemBackups").remove(),
     ]);
     showToast("تم حذف كل بيانات النظام - الموقع رجع لحالته الأولى", "success");
     document.getElementById("factoryResetModal").classList.add("hidden");
