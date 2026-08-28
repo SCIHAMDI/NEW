@@ -42,7 +42,7 @@ body{
   direction: rtl;
   min-height: 100vh;
   width: 100%;
-  overflow-x: hidden; /* حماية إضافية: يمنع ظهور الموقع بعرض شاشة كمبيوتر على الموبايل لو أي عنصر فاض عرضياً بالغلط */
+  overflow-x: hidden; /* حماية إضافية: يمنع ظهور الموقع بعرض شاشة كمبيوتر على الموبايل لو أي عنصرفاض عرضياً بالغلط */
   -webkit-font-smoothing: antialiased;
 }
 
@@ -690,5 +690,39 @@ body.lang-en .topbar-brand{ text-align: left; }
 .report-print-area .r-empty{ font-size:11.5px; color:#999; padding:6px 0; }
 
 @media print{
-  body.print-full-report .report-print-area{ max-height:none; overflow:visible; border:none; padding:0; }
+  body.print-full-report,
+  body.print-full-report html,
+  body.print-full-report .modal-overlay,
+  body.print-full-report .modal-box,
+  body.print-full-report .modal-body,
+  body.print-full-report #fullReportPrintArea,
+  body.print-full-report .report-print-area {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
+    position: static !important;
+  }
+
+  body.print-full-report .report-print-area{ border:none; padding:0; }
+  
+  body.print-full-report .modal-overlay {
+    background: transparent !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+  
+  body.print-full-report .modal-box {
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  body.print-full-report thead {
+    display: table-header-group;
+  }
+
+  body.print-full-report tr {
+    page-break-inside: avoid;
+  }
 }
