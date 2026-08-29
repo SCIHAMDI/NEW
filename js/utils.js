@@ -19,7 +19,7 @@ async function generateUniqueStudentId() {
   let tries = 0;
   while (tries < 30) {
     const code = String(Math.floor(1000 + Math.random() * 9000));
-    const snap = await db.ref("students/" + code).get();
+    const snap = await offlineDb.ref("students/" + code).get();
     if (!snap.exists()) return code;
     tries++;
   }
@@ -168,11 +168,11 @@ let WA_CONFIG = { disableAutoPopup: false, webhookUrl: "", notifySound: "" };
 
 async function loadWaConfig() {
   try {
-    const snap = await db.ref("settings/systemConfig").get();
+    const snap = await offlineDb.ref("settings/systemConfig").get();
     if (snap.exists()) WA_CONFIG = Object.assign(WA_CONFIG, snap.val());
   } catch (e) { /* تجاهل - هيفضل شغال بالإعدادات الافتراضية */ }
   // استماع دائم لأي تحديث للإعدادات دي (لو الأدمن غيّرها من تبويب الإعدادات في تبويب/جهاز تاني)
-  db.ref("settings/systemConfig").on("value", (snap) => {
+  offlineDb.ref("settings/systemConfig").on("value", (snap) => {
     if (snap.exists()) WA_CONFIG = Object.assign({ disableAutoPopup: false, webhookUrl: "", notifySound: "" }, snap.val());
   });
 }
@@ -374,10 +374,10 @@ function isScheduledNow(subjects, graceMinutes = 20) {
 /* ---------- عداد "متصل الآن" باستخدام Firebase Presence ---------- */
 function trackPresence(pageName) {
   try {
-    const connectedRef = db.ref(".info/connected");
+    const connectedRef = offlineDb.ref(".info/connected");
     connectedRef.on("value", (snap) => {
       if (snap.val() === true) {
-        const myRef = db.ref("presence/" + Date.now() + "_" + Math.random().toString(36).slice(2));
+        const myRef = offlineDb.ref("presence/" + Date.now() + "_" + Math.random().toString(36).slice(2));
         myRef.set({ page: pageName, at: Date.now() });
         myRef.onDisconnect().remove();
       }
@@ -388,13 +388,13 @@ function trackPresence(pageName) {
 /* عداد "عدد مرات الفتح" - تزويد رقم بسيط لكل تحميل صفحة (الإجمالي - بدون تعديل) */
 function trackPageView() {
   try {
-    db.ref("stats/pageViews").transaction((v) => (v || 0) + 1);
+    offlineDb.ref("stats/pageViews").transaction((v) => (v || 0) + 1);
   } catch (e) {}
   // إضافة: سجل زمني لآخر 24 ساعة + تتبع الزيارات المباشرة (رابط مباشر بدون referrer)
   try {
     const isDirect = !document.referrer || document.referrer.indexOf(window.location.hostname) === -1;
-    db.ref("stats/pageViewsLog").push({ at: Date.now(), direct: isDirect });
-    if (isDirect) db.ref("stats/directTraffic").transaction((v) => (v || 0) + 1);
+    offlineDb.ref("stats/pageViewsLog").push({ at: Date.now(), direct: isDirect });
+    if (isDirect) offlineDb.ref("stats/directTraffic").transaction((v) => (v || 0) + 1);
   } catch (e) {}
 }
 
@@ -404,7 +404,7 @@ function trackPageView() {
 async function getViewsLast24h() {
   try {
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    const snap = await db.ref("stats/pageViewsLog").get();
+    const snap = await offlineDb.ref("stats/pageViewsLog").get();
     if (!snap.exists()) return 0;
     return Object.values(snap.val()).filter((v) => v && v.at >= cutoff).length;
   } catch (e) { console.error("فشل حساب عدد الزيارات آخر 24 ساعة:", e); return 0; }
@@ -414,11 +414,11 @@ async function getViewsLast24h() {
 async function cleanupOldViewLogs() {
   try {
     const cutoff = Date.now() - 48 * 60 * 60 * 1000;
-    const snap = await db.ref("stats/pageViewsLog").get();
+    const snap = await offlineDb.ref("stats/pageViewsLog").get();
     if (!snap.exists()) return;
     const updates = {};
     Object.entries(snap.val()).forEach(([k, v]) => { if (v && v.at < cutoff) updates[k] = null; });
-    if (Object.keys(updates).length) await db.ref("stats/pageViewsLog").update(updates);
+    if (Object.keys(updates).length) await offlineDb.ref("stats/pageViewsLog").update(updates);
   } catch (e) {}
 }
 
@@ -465,7 +465,7 @@ async function loadAndApplyTheme(scope) {
     const cached = localStorage.getItem("theme_" + scope);
     if (cached) applySavedTheme(scope, JSON.parse(cached));
 
-    const snap = await db.ref("settings/" + scope).get();
+    const snap = await offlineDb.ref("settings/" + scope).get();
     if (snap.exists()) {
       const settings = snap.val();
       applySavedTheme(scope, settings);

@@ -3,13 +3,10 @@
   "name": "تطبيق سنتر العلا التعليمي",
   "short_name": "سنتر العلا",
   "description": "تطبيق سنتر العلا التعليمي لمتابعة درجات وقوائم الطلاب",
-
   "lang": "ar",
   "dir": "rtl",
-
-  "start_url": "/samtr/",
-  "scope": "/samtr/",
-
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "display_override": [
     "window-controls-overlay",
@@ -17,12 +14,9 @@
     "minimal-ui",
     "browser"
   ],
-
   "orientation": "portrait-primary",
-
   "background_color": "#ffffff",
   "theme_color": "#3498db",
-
   "icons": [
     {
       "src": "android/launchericon-192x192.png",

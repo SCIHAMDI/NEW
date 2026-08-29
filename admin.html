@@ -792,6 +792,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="js/firebase-config.js"></script>
+<script src="js/offline-db.js"></script>
 <script src="js/utils.js"></script>
 
 <!-- QR generate + QR scan libraries -->
@@ -806,5 +807,15 @@
 <script src="js/data-export.js"></script>
 
 <script src="js/admin.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js", {scope:"./"})
+      .then(() => console.log("Al Ola PWA Service Worker registered"))
+      .catch(err => console.warn("PWA registration failed:", err));
+  });
+}
+</script>
+<script src="js/pwa-install.js"></script>
 </body>
 </html>

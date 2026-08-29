@@ -3,21 +3,19 @@
   "name": "لوحة تحكم Al Ola Center",
   "short_name": "لوحة الأدمن",
   "description": "لوحة تحكم إدارة سنتر العلا التعليمي - حضور وانصراف، مصروفات، طلاب ومدرسين",
-
   "lang": "ar",
   "dir": "rtl",
-
-  "start_url": "admin.html",
+  "start_url": "./admin.html",
   "scope": "./",
-
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
-
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "any",
-
   "background_color": "#0a1730",
   "theme_color": "#3498db",
-
   "icons": [
     {
       "src": "android/launchericon-192x192.png",

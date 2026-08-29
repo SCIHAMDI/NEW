@@ -62,7 +62,7 @@ function attachBadgeListeners() {
   // اللي بيتنقل تلقائياً لمسار اليوم الجديد كل 24 ساعة - شوف renderAbsenteesList()
 
   // شارة "الشكاوى والاستفسارات": عدد المحادثات اللي آخر رسالة فيها من الطالب (لسه محتاجة رد)
-  db.ref("supportChats").on("value", (snap) => {
+  offlineDb.ref("supportChats").on("value", (snap) => {
     const all = snap.exists() ? snap.val() : {};
     let open = 0;
     Object.values(all).forEach((c) => {
@@ -79,30 +79,9 @@ function attachBadgeListeners() {
    ========================================================== */
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("admin-sw.js").catch((e) => console.warn("تعذر تسجيل Service Worker:", e));
+    navigator.serviceWorker.register("sw.js", { scope: "./" }).catch((e) => console.warn("تعذر تسجيل Service Worker:", e));
   });
 }
-
-let deferredInstallPrompt = null;
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault(); // منع النافذة التلقائية اللي بيقترحها المتصفح، وإظهار زرارنا الخاص بدل منها
-  deferredInstallPrompt = e;
-  document.getElementById("installAppBtn").classList.remove("hidden");
-});
-
-document.getElementById("installAppBtn").addEventListener("click", async () => {
-  if (!deferredInstallPrompt) return;
-  deferredInstallPrompt.prompt();
-  const { outcome } = await deferredInstallPrompt.userChoice;
-  if (outcome === "accepted") showToast("تم تثبيت التطبيق بنجاح - هتلاقيه على سطح المكتب", "success");
-  deferredInstallPrompt = null;
-  document.getElementById("installAppBtn").classList.add("hidden");
-});
-
-// لو التطبيق اتثبت بالفعل، إخفاء الزرار (مفيش داعي نعرضه تاني)
-window.addEventListener("appinstalled", () => {
-  document.getElementById("installAppBtn").classList.add("hidden");
-});
 
 async function init() {
   trackPresence("admin");
@@ -133,7 +112,7 @@ const teachersFirstLoadPromise = new Promise((resolve) => (resolveTeachersFirstL
 // على مسار teachers من قاعدة البيانات - بيشتغل فوراً من لحظة تحميل الصفحة (قراءة teachers مسموحة
 // للجميع في الـ Rules)، وأي تغيير في المدرسين (إضافة/حذف/تعديل مجموعة) بيتحدث في كل القوائم
 // المعروضة على طول تلقائياً بدون ما تحتاج تعمل ريفريش أو تضيف مدرس جديد الأول.
-db.ref("teachers").on("value", (snap) => {
+offlineDb.ref("teachers").on("value", (snap) => {
   teachersCache = snap.exists() ? snap.val() : {};
   renderTeachersList();
   refreshAllTeacherSelects();
@@ -161,7 +140,7 @@ document.getElementById("teacherForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = document.getElementById("t_name").value.trim();
   if (!name) return;
-  await db.ref("teachers").push({ name, groups: {} });
+  await offlineDb.ref("teachers").push({ name, groups: {} });
   document.getElementById("t_name").value = "";
   showToast("تم إضافة المدرس", "success");
   // مفيش داعي نعمل تحميل يدوي - الـ realtime listener هيحدث القائمة تلقائياً
@@ -211,7 +190,7 @@ function renderTeachersList() {
       const pill = el(`<span class="group-pill">${escapeHtml(g.label)} - ${escapeHtml(parseDaysCsv(g.day).join("، "))} - ${escapeHtml(g.time)} <span class="count">${counts[groupId] || 0}</span> <b data-del-group="${groupId}" style="cursor:pointer; color:var(--pink);">✕</b></span>`);
       pill.querySelector("[data-del-group]").addEventListener("click", async () => {
         if (!confirm("حذف هذه المجموعة؟")) return;
-        await db.ref(`teachers/${teacherId}/groups/${groupId}`).remove();
+        await offlineDb.ref(`teachers/${teacherId}/groups/${groupId}`).remove();
         await loadTeachersCache();
       });
       pillsWrap.appendChild(pill);
@@ -219,7 +198,7 @@ function renderTeachersList() {
 
     card.querySelector("[data-del-teacher]").addEventListener("click", async () => {
       if (!confirm("حذف هذا المدرس وكل مجموعاته؟")) return;
-      await db.ref("teachers/" + teacherId).remove();
+      await offlineDb.ref("teachers/" + teacherId).remove();
       await loadTeachersCache();
     });
 
@@ -231,7 +210,7 @@ function renderTeachersList() {
       const time = f.querySelector("[data-time]").value;
       const fee = f.querySelector("[data-fee]").value;
       if (!day) { showToast("اختار يوم واحد على الأقل للمجموعة", "error"); return; }
-      await db.ref(`teachers/${teacherId}/groups`).push({ label, day, time, fee });
+      await offlineDb.ref(`teachers/${teacherId}/groups`).push({ label, day, time, fee });
       showToast("تم إضافة المجموعة", "success");
       await loadTeachersCache();
     });
@@ -481,7 +460,7 @@ document.getElementById("createForm").addEventListener("submit", async (e) => {
 
     const code = await generateUniqueStudentId();
 
-    await db.ref("students/" + code).set({
+    await offlineDb.ref("students/" + code).set({
       code, name, grade, parentPhone,
       studentNumber: studentNumber || "",
       address: address || "غير محدد",
@@ -521,7 +500,7 @@ document.getElementById("createForm").addEventListener("submit", async (e) => {
    TAB: الرئيسية (Overview)
    ========================================================== */
 async function loadOverview() {
-  const snap = await db.ref("students").get();
+  const snap = await offlineDb.ref("students").get();
   studentsCache = snap.exists() ? snap.val() : {};
   const students = Object.entries(studentsCache);
 
@@ -544,21 +523,21 @@ async function loadOverview() {
   document.getElementById("ov_paidCount").textContent = paid;
   document.getElementById("ov_unpaidCount").textContent = unpaid;
 
-  const reqSnap = await db.ref("paymentRequests").get();
+  const reqSnap = await offlineDb.ref("paymentRequests").get();
   const allReqs = reqSnap.exists() ? reqSnap.val() : {};
   document.getElementById("ov_requestsCount").textContent = Object.values(allReqs).filter((r) => r && r.status === "pending").length;
 
   // آخر 24 ساعة + الزيارات المباشرة
   getViewsLast24h().then((n) => (document.getElementById("ov_views24h").textContent = n));
-  db.ref("stats/directTraffic").get().then((s) => (document.getElementById("ov_directTraffic").textContent = s.val() || 0));
+  offlineDb.ref("stats/directTraffic").get().then((s) => (document.getElementById("ov_directTraffic").textContent = s.val() || 0));
 
   // غائبين اليوم
-  db.ref("absentees/" + todayKey()).get().then((s) => {
+  offlineDb.ref("absentees/" + todayKey()).get().then((s) => {
     document.getElementById("ov_absentToday").textContent = s.exists() ? Object.keys(s.val()).length : 0;
   });
 
   // استفسارات لم يتم الرد عليها
-  db.ref("supportChats").get().then((s) => {
+  offlineDb.ref("supportChats").get().then((s) => {
     if (!s.exists()) { document.getElementById("ov_openTickets").textContent = 0; return; }
     const chats = s.val();
     let open = 0;
@@ -578,13 +557,13 @@ function attachLiveOverviewListeners() {
   if (liveListenersAttached) return;
   liveListenersAttached = true;
   // متصلين الآن (presence) - listener مباشر - بيتحسب بس اللي فاتحين بوابة الطالب فعلاً (مش جلسة الأدمن نفسها)
-  db.ref("presence").on("value", (s) => {
+  offlineDb.ref("presence").on("value", (s) => {
     if (!s.exists()) { document.getElementById("ov_online").textContent = 0; return; }
     const studentSessions = Object.values(s.val()).filter((p) => p && p.page === "student");
     document.getElementById("ov_online").textContent = studentSessions.length;
   });
   // عدد مرات الفتح
-  db.ref("stats/pageViews").on("value", (s) => {
+  offlineDb.ref("stats/pageViews").on("value", (s) => {
     document.getElementById("ov_pageViews").textContent = s.val() || 0;
   });
   // إجمالي المبالغ المحصّلة هذا الشهر - بيتحدث عن طريق attachFinanceRealtimeSync() (تحسين أداء:
@@ -620,7 +599,7 @@ function isStudentPaidThisMonth(student) {
 
 // ----- Modal: كل الطلاب -----
 document.getElementById("openAllStudentsBtn").addEventListener("click", async () => {
-  const snap = await db.ref("students").get();
+  const snap = await offlineDb.ref("students").get();
   studentsCache = snap.exists() ? snap.val() : {};
   renderAllStudentsList(studentsCache);
   document.getElementById("allStudentsModal").classList.remove("hidden");
@@ -666,7 +645,7 @@ async function searchStudentForGrades() {
   const code = document.getElementById("g_code").value.trim();
   if (!code) return showToast("اكتب كود الطالب أولاً", "error");
 
-  const snap = await db.ref("students/" + code).get();
+  const snap = await offlineDb.ref("students/" + code).get();
   if (!snap.exists()) {
     showToast("لا يوجد طالب بهذا الكود", "error");
     document.getElementById("g_studentBox").style.display = "none";
@@ -691,12 +670,12 @@ document.getElementById("gradeForm").addEventListener("submit", async (e) => {
   const maxScore = document.getElementById("g_maxScore").value;
 
   try {
-    await db.ref("students/" + g_currentCode + "/grades").push({
+    await offlineDb.ref("students/" + g_currentCode + "/grades").push({
       examName, date: examDate, score: Number(score), maxScore: Number(maxScore), createdAt: new Date().toISOString(),
     });
     showToast("تم حفظ الدرجة بنجاح", "success");
     document.getElementById("gradeForm").reset();
-    const snap = await db.ref("students/" + g_currentCode + "/grades").get();
+    const snap = await offlineDb.ref("students/" + g_currentCode + "/grades").get();
     renderGradesTable(snap.val() || {});
   } catch (err) {
     showToast("حدث خطأ أثناء الحفظ: " + err.message, "error");
@@ -762,7 +741,7 @@ async function searchStudentForEdit() {
   const code = document.getElementById("e_code").value.trim();
   if (!code) return showToast("اكتب كود الطالب أولاً", "error");
 
-  const snap = await db.ref("students/" + code).get();
+  const snap = await offlineDb.ref("students/" + code).get();
   if (!snap.exists()) {
     showToast("لا يوجد طالب بهذا الكود", "error");
     document.getElementById("editForm").classList.add("hidden");
@@ -818,7 +797,7 @@ document.getElementById("editForm").addEventListener("submit", async (e) => {
     // ما بنعدلش بصمة الوجه المخزنة إلا لو الأدمن التقط بصمة جديدة فعلاً
     if (e_capturedFaceDescriptor) updates.faceDescriptor = e_capturedFaceDescriptor;
 
-    await db.ref("students/" + e_currentCode).update(updates);
+    await offlineDb.ref("students/" + e_currentCode).update(updates);
     showToast("تم حفظ التعديلات بنجاح", "success");
     if (e_capturedFaceDescriptor) {
       document.getElementById("e_faceCurrentStatus").textContent = "✅ الطالب مسجّل بصمة وجه بالفعل - تقدر تلتقط بصمة جديدة تستبدلها لو حبيت";
@@ -833,7 +812,7 @@ document.getElementById("e_deleteBtn").addEventListener("click", async () => {
   if (!e_currentCode) return showToast("ابحث عن طالب أولاً", "error");
   if (!confirm("هل أنت متأكد من حذف هذا الطالب نهائياً؟ لا يمكن التراجع.")) return;
   try {
-    await db.ref("students/" + e_currentCode).remove();
+    await offlineDb.ref("students/" + e_currentCode).remove();
     showToast("تم حذف الطالب", "success");
     document.getElementById("editForm").classList.add("hidden");
     document.getElementById("e_code").value = "";
@@ -852,7 +831,7 @@ async function openStudentCard(code, name, grade) {
 
   // بيانات الإدارة/التواصل - قابلة للتعديل من الإعدادات، ولها قيم افتراضية جاهزة
   try {
-    const snap = await db.ref("settings/systemConfig").get();
+    const snap = await offlineDb.ref("settings/systemConfig").get();
     const cfg = snap.exists() ? snap.val() : {};
     document.getElementById("card_managerName").textContent = cfg.cardManagerName || "أ/ أحمد جمال عمر";
     document.getElementById("card_phone1").textContent = cfg.cardPhone1 || "01143229861";
@@ -950,7 +929,7 @@ async function startFaceAttendance() {
     document.getElementById("toggleFaceBtn").textContent = "⏹ إيقاف كاميرا بصمة الوجه";
     status.className = ""; status.textContent = "بيدور على وجه الطالب تلقائياً...";
     if (!Object.keys(studentsCache).length) {
-      const snap = await db.ref("students").get();
+      const snap = await offlineDb.ref("students").get();
       studentsCache = snap.exists() ? snap.val() : {};
     }
     faceScanInterval = setInterval(scanFaceForAttendance, 1200);
@@ -1013,7 +992,7 @@ async function onScanSuccess(decodedText) {
 
 async function handleAttendanceScan(code, { override }) {
   const resultBox = document.getElementById("scanResult");
-  const snap = await db.ref("students/" + code).get();
+  const snap = await offlineDb.ref("students/" + code).get();
   if (!snap.exists()) {
     resultBox.className = "scan-result";
     resultBox.innerHTML = "❌ كود غير معروف: " + escapeHtml(code);
@@ -1074,16 +1053,16 @@ async function proceedAttendance(code, student, resultBox) {
 
   let message, type;
   if (!openIn) {
-    await db.ref("students/" + code + "/attendance").push({ date: today, type: "in", time: timeStr, timeMinutes: minutes, timestamp: now.toISOString(), checkedOut: false });
+    await offlineDb.ref("students/" + code + "/attendance").push({ date: today, type: "in", time: timeStr, timeMinutes: minutes, timestamp: now.toISOString(), checkedOut: false });
     type = "in";
     message = `مرحباً، تم تسجيل حضور الطالب ${student.name} اليوم الساعة ${timeStr} - Al Ola Center`;
     resultBox.className = "scan-result in";
     // بمجرد ما الطالب يسجل حضوره (بأي طريقة: كود، باركود، أو بصمة وجه)، يتشال فوراً من قائمة الغائبين اليوم
-    db.ref(`absentees/${today}/${code}`).remove().catch(() => {});
+    offlineDb.ref(`absentees/${today}/${code}`).remove().catch(() => {});
   } else {
     const [key] = openIn;
-    await db.ref(`students/${code}/attendance/${key}`).update({ checkedOut: true, outTime: timeStr });
-    await db.ref("students/" + code + "/attendance").push({ date: today, type: "out", time: timeStr, timeMinutes: minutes, timestamp: now.toISOString() });
+    await offlineDb.ref(`students/${code}/attendance/${key}`).update({ checkedOut: true, outTime: timeStr });
+    await offlineDb.ref("students/" + code + "/attendance").push({ date: today, type: "out", time: timeStr, timeMinutes: minutes, timestamp: now.toISOString() });
     type = "out";
     message = `تم تسجيل انصراف الطالب ${student.name} اليوم الساعة ${timeStr} - Al Ola Center`;
     resultBox.className = "scan-result out";
@@ -1106,7 +1085,7 @@ async function proceedAttendance(code, student, resultBox) {
 async function loadTodayAttendance() {
   const tbody = document.querySelector("#attTable tbody");
   const emptyBox = document.getElementById("attEmpty");
-  const snap = await db.ref("students").get();
+  const snap = await offlineDb.ref("students").get();
   if (!snap.exists()) return;
 
   studentsCache = snap.val();
@@ -1139,7 +1118,7 @@ async function loadTodayAttendance() {
 async function refreshMissedList() {
   const wrap = document.getElementById("missedList");
   const empty = document.getElementById("missedEmpty");
-  const snap = await db.ref("students").get();
+  const snap = await offlineDb.ref("students").get();
   if (!snap.exists()) { wrap.innerHTML = ""; empty.classList.remove("hidden"); return; }
 
   studentsCache = snap.val();
@@ -1207,7 +1186,7 @@ document.getElementById("pay_monthSelect").addEventListener("change", (e) => {
 async function searchStudentForPayments() {
   const code = document.getElementById("pay_code").value.trim();
   if (!code) return showToast("اكتب كود الطالب أولاً", "error");
-  const snap = await db.ref("students/" + code).get();
+  const snap = await offlineDb.ref("students/" + code).get();
   if (!snap.exists()) return showToast("لا يوجد طالب بهذا الكود", "error");
 
   const student = snap.val();
@@ -1269,9 +1248,9 @@ function renderPaymentSubjects(code, student, monthKey) {
       g.subjectKeys.forEach((k) => (updates[k] = true));
       const nowISO = new Date().toISOString();
       await Promise.all([
-        db.ref(`students/${code}/payments/${monthKey}`).update(updates),
+        offlineDb.ref(`students/${code}/payments/${monthKey}`).update(updates),
         // بداية دورة اشتراك جديدة 30 يوم من النهاردة بالظبط (مش من أول الشهر الجاي)
-        db.ref(`students/${code}/subscriptionDates/${g.billingKey}`).set(nowISO),
+        offlineDb.ref(`students/${code}/subscriptionDates/${g.billingKey}`).set(nowISO),
       ]);
       row.querySelector("[data-yes]").classList.add("active");
       row.querySelector("[data-yes]").disabled = true;
@@ -1289,7 +1268,7 @@ function renderPaymentSubjects(code, student, monthKey) {
     row.querySelector("[data-no]").addEventListener("click", async () => {
       const updates = {};
       g.subjectKeys.forEach((k) => (updates[k] = null));
-      await db.ref(`students/${code}/payments/${monthKey}`).update(updates);
+      await offlineDb.ref(`students/${code}/payments/${monthKey}`).update(updates);
       row.querySelector("[data-no]").classList.add("active");
       row.querySelector("[data-yes]").classList.remove("active");
       showToast("تم تعليم المادة كغير مدفوعة", "success");
@@ -1307,7 +1286,7 @@ async function loadPaymentRequests() {
   // إصلاح: بدل ما نعتمد على orderByChild("status") اللي محتاجة .indexOn معرّف صح في Database Rules
   // (وأي خطأ فيها كان بيسبب اختفاء الطلبات بصمت من غير أي رسالة خطأ)، بنجيب كل الطلبات ونفلترها
   // في المتصفح نفسه - ده بيشتغل مهما كانت الـ Rules، وأي خطأ صلاحيات هيظهر واضح كـ Toast.
-  db.ref("paymentRequests").on(
+  offlineDb.ref("paymentRequests").on(
     "value",
     (snap) => {
       wrap.innerHTML = "";
@@ -1346,14 +1325,14 @@ async function loadPaymentRequests() {
           if (keysToMark.length) {
             const updates = {};
             keysToMark.forEach((k) => (updates[k] = true));
-            writes.push(db.ref(`students/${r.code}/payments/${r.month}`).update(updates));
+            writes.push(offlineDb.ref(`students/${r.code}/payments/${r.month}`).update(updates));
           }
           // بداية دورة اشتراك جديدة 30 يوم من النهاردة (لو الطلب فيه billingKey - الطلبات
           // القديمة قبل هذا التحديث مش هيبقى فيها الحقل ده، فهتفضل شغالة بالنظام القديم بس)
           if (r.billingKey) {
-            writes.push(db.ref(`students/${r.code}/subscriptionDates/${r.billingKey}`).set(new Date().toISOString()));
+            writes.push(offlineDb.ref(`students/${r.code}/subscriptionDates/${r.billingKey}`).set(new Date().toISOString()));
           }
-          writes.push(db.ref(`paymentRequests/${reqId}`).update({ status: "approved", amount }));
+          writes.push(offlineDb.ref(`paymentRequests/${reqId}`).update({ status: "approved", amount }));
           await Promise.all(writes);
           playNotifySound();
           showToast("تم تأكيد الدفع", "success");
@@ -1363,7 +1342,7 @@ async function loadPaymentRequests() {
           loadOverview();
         });
         card.querySelector("[data-reject]").addEventListener("click", async () => {
-          await db.ref(`paymentRequests/${reqId}`).update({ status: "rejected" });
+          await offlineDb.ref(`paymentRequests/${reqId}`).update({ status: "rejected" });
           showToast("تم رفض الطلب", "success");
           loadOverview();
         });
@@ -1394,14 +1373,14 @@ document.getElementById("n_mode").addEventListener("change", async (e) => {
 
   if (mode === "filter") await populateNotesFilterOptions();
   if (mode === "all") {
-    const all = Object.keys(studentsCache).length || Object.keys((await db.ref("students").get()).val() || {}).length;
+    const all = Object.keys(studentsCache).length || Object.keys((await offlineDb.ref("students").get()).val() || {}).length;
     document.getElementById("n_allCount").textContent = all;
   }
 });
 
 async function populateNotesFilterOptions() {
   if (!Object.keys(studentsCache).length) {
-    const snap = await db.ref("students").get();
+    const snap = await offlineDb.ref("students").get();
     studentsCache = snap.exists() ? snap.val() : {};
   }
   const grades = new Set();
@@ -1441,7 +1420,7 @@ document.getElementById("n_code").addEventListener("keydown", (e) => { if (e.key
 async function searchStudentForNotes() {
   const code = document.getElementById("n_code").value.trim();
   if (!code) return showToast("اكتب كود الطالب أولاً", "error");
-  const snap = await db.ref("students/" + code).get();
+  const snap = await offlineDb.ref("students/" + code).get();
   if (!snap.exists()) return showToast("لا يوجد طالب بهذا الكود", "error");
 
   const student = snap.val();
@@ -1452,7 +1431,7 @@ async function searchStudentForNotes() {
 }
 
 async function sendNoteToStudent(code, student, text) {
-  await db.ref("students/" + code + "/notes").push({ text, createdAt: new Date().toISOString() });
+  await offlineDb.ref("students/" + code + "/notes").push({ text, createdAt: new Date().toISOString() });
   return student.parentPhone;
 }
 
@@ -1466,13 +1445,13 @@ document.getElementById("n_sendBtn").addEventListener("click", async () => {
 
   if (mode === "single") {
     if (!n_currentCode) return showToast("دور على طالب أولاً بالكود", "error");
-    const snap = await db.ref("students/" + n_currentCode).get();
+    const snap = await offlineDb.ref("students/" + n_currentCode).get();
     const student = snap.val();
     const phone = await sendNoteToStudent(n_currentCode, student, text);
     document.getElementById("n_text").value = "";
     showToast("تم حفظ الملاحظة", "success");
     waSlot.appendChild(renderWhatsAppControl(phone, `ملاحظة من Al Ola Center بخصوص الطالب ${student.name}:\n${text}`));
-    const newSnap = await db.ref("students/" + n_currentCode + "/notes").get();
+    const newSnap = await offlineDb.ref("students/" + n_currentCode + "/notes").get();
     renderNotesList(newSnap.val() || {});
     return;
   }
@@ -1508,7 +1487,7 @@ function renderNotesList(notes) {
    TAB: عدد الطلاب في المجموعة (Groups Overview)
    ========================================================== */
 async function loadGroupsOverview() {
-  const snap = await db.ref("students").get();
+  const snap = await offlineDb.ref("students").get();
   studentsCache = snap.exists() ? snap.val() : {};
   document.getElementById("gr_totalAll").textContent = Object.keys(studentsCache).length;
 
@@ -1547,7 +1526,7 @@ let absenteesCache = {};
 
 async function detectAndLogAbsentees() {
   if (!Object.keys(studentsCache).length) {
-    const snap = await db.ref("students").get();
+    const snap = await offlineDb.ref("students").get();
     studentsCache = snap.exists() ? snap.val() : {};
   }
   const today = todayKey();
@@ -1586,7 +1565,7 @@ async function detectAndLogAbsentees() {
   // تسجيل في قاعدة البيانات (بدون تكرار لو مسجل قبل كده اليوم)
   for (const f of found) {
     try {
-      const ref = db.ref(`absentees/${today}/${f.code}`);
+      const ref = offlineDb.ref(`absentees/${today}/${f.code}`);
       const existing = await ref.get();
       if (!existing.exists()) {
         await ref.set({ name: f.name, phone: f.phone || "", time: f.time, subjects: f.subjectNames, status: "pending", detectedAt: Date.now() });
@@ -1619,7 +1598,7 @@ function attachAbsenteesListener() {
   if (absenteesListenerDate === today) return; // مشترك في نفس يوم النهاردة أصلاً
   if (absenteesListenerRef) absenteesListenerRef.off();
   absenteesListenerDate = today;
-  absenteesListenerRef = db.ref("absentees/" + today);
+  absenteesListenerRef = offlineDb.ref("absentees/" + today);
   absenteesListenerRef.on("value", (snap) => {
     absenteesCache = snap.exists() ? snap.val() : {};
     renderAbsenteesList();
@@ -1653,12 +1632,12 @@ function renderAbsenteesList() {
     btn.addEventListener("click", async () => {
       const msg = `تنبيه غياب: الطالب ${a.name} لم يحضر معاده اليوم (${a.time}) في Al Ola Center`;
       sendWhatsApp(a.phone, msg);
-      await db.ref(`absentees/${today}/${code}/status`).set("sent");
+      await offlineDb.ref(`absentees/${today}/${code}/status`).set("sent");
     });
     const delBtn = el(`<button class="btn btn-outline" title="حذف من قائمة الغائبين اليوم" style="margin-right:6px;">🗑️</button>`);
     delBtn.addEventListener("click", async () => {
       if (!confirm(`تأكيد حذف ${a.name} من قائمة الغائبين اليوم؟`)) return;
-      await db.ref(`absentees/${today}/${code}`).remove();
+      await offlineDb.ref(`absentees/${today}/${code}`).remove();
       showToast("تم حذف السجل من قائمة الغائبين", "success");
     });
     row.lastElementChild.appendChild(btn);
@@ -1686,7 +1665,7 @@ document.getElementById("ab_sendAllBtn").addEventListener("click", async () => {
     btn.textContent = `📱 جاري الإرسال (${i + 1} / ${pending.length})...`;
     const msg = `تنبيه غياب: الطالب ${a.name} لم يحضر معاده اليوم (${a.time}) في Al Ola Center`;
     sendWhatsApp(a.phone, msg);
-    await db.ref(`absentees/${today}/${code}/status`).set("sent");
+    await offlineDb.ref(`absentees/${today}/${code}/status`).set("sent");
     if (i < pending.length - 1) await sleep(GAP_MS);
   }
 
@@ -1699,7 +1678,7 @@ document.getElementById("ab_deleteAllBtn").addEventListener("click", async () =>
   const count = Object.keys(absenteesCache).length;
   if (!count) return showToast("قائمة الغائبين فاضية أصلاً", "success");
   if (!confirm(`تأكيد حذف كل قائمة الغائبين اليوم (${count} طالب)؟ الحذف نهائي.`)) return;
-  await db.ref(`absentees/${today}`).remove();
+  await offlineDb.ref(`absentees/${today}`).remove();
   showToast("تم حذف كل قائمة الغائبين لليوم", "success");
 });
 
@@ -1709,7 +1688,7 @@ document.getElementById("ab_deleteAllBtn").addEventListener("click", async () =>
 let currentSupportCode = null;
 
 async function loadSupportInbox() {
-  const snap = await db.ref("supportChats").get();
+  const snap = await offlineDb.ref("supportChats").get();
   const wrap = document.getElementById("supportConvList");
   const empty = document.getElementById("supportConvEmpty");
   wrap.innerHTML = "";
@@ -1742,10 +1721,10 @@ document.getElementById("supportReplyBtn").addEventListener("click", async () =>
   const input = document.getElementById("supportReplyInput");
   const text = input.value.trim();
   if (!text) return;
-  await db.ref(`supportChats/${currentSupportCode}/messages`).push({ text, from: "admin", at: Date.now() });
-  await db.ref(`supportChats/${currentSupportCode}/lastAt`).set(Date.now());
+  await offlineDb.ref(`supportChats/${currentSupportCode}/messages`).push({ text, from: "admin", at: Date.now() });
+  await offlineDb.ref(`supportChats/${currentSupportCode}/lastAt`).set(Date.now());
   input.value = "";
-  const snap = await db.ref("supportChats/" + currentSupportCode).get();
+  const snap = await offlineDb.ref("supportChats/" + currentSupportCode).get();
   openSupportConversation(currentSupportCode, snap.val());
   loadSupportInbox();
 });
@@ -1754,13 +1733,13 @@ document.getElementById("supportReplyBtn").addEventListener("click", async () =>
 async function cleanupOldSupportChats() {
   try {
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-    const snap = await db.ref("supportChats").get();
+    const snap = await offlineDb.ref("supportChats").get();
     if (!snap.exists()) return;
     const updates = {};
     Object.entries(snap.val()).forEach(([code, c]) => {
       if ((c.lastAt || 0) < cutoff) updates[code] = null;
     });
-    if (Object.keys(updates).length) await db.ref("supportChats").update(updates);
+    if (Object.keys(updates).length) await offlineDb.ref("supportChats").update(updates);
   } catch (e) {}
 }
 
@@ -1768,7 +1747,7 @@ async function cleanupOldSupportChats() {
    TAB: الإعدادات (لغة / ثيم / لوجو / سجل مصاريف / أدوات إدارية)
    ========================================================== */
 async function loadSettingsPanel() {
-  const [adminSnap, studentSnap, waSnap] = await Promise.all([db.ref("settings/admin").get(), db.ref("settings/student").get(), db.ref("settings/systemConfig").get()]);
+  const [adminSnap, studentSnap, waSnap] = await Promise.all([offlineDb.ref("settings/admin").get(), offlineDb.ref("settings/student").get(), offlineDb.ref("settings/systemConfig").get()]);
   const adminS = adminSnap.exists() ? adminSnap.val() : {};
   const studentS = studentSnap.exists() ? studentSnap.val() : {};
   const waS = waSnap.exists() ? waSnap.val() : {};
@@ -1799,7 +1778,7 @@ document.getElementById("settingsStudentOpacity").addEventListener("input", (e) 
 document.getElementById("settingsSaveWaBtn").addEventListener("click", async () => {
   try {
     // استخدام update بدل set عشان مانمسحش صوت الإشعارات المحفوظ في نفس الـ node
-    await db.ref("settings/systemConfig").update({
+    await offlineDb.ref("settings/systemConfig").update({
       disableAutoPopup: document.getElementById("settingsDisableAutoPopup").checked,
       webhookUrl: document.getElementById("settingsWebhookUrl").value.trim(),
     });
@@ -1809,7 +1788,7 @@ document.getElementById("settingsSaveWaBtn").addEventListener("click", async () 
 
 document.getElementById("settingsSaveCardInfoBtn").addEventListener("click", async () => {
   try {
-    await db.ref("settings/systemConfig").update({
+    await offlineDb.ref("settings/systemConfig").update({
       cardManagerName: document.getElementById("settingsCardManagerName").value.trim(),
       cardAddress: document.getElementById("settingsCardAddress").value.trim(),
       cardPhone1: document.getElementById("settingsCardPhone1").value.trim(),
@@ -1824,7 +1803,7 @@ document.getElementById("settingsNotifySound").addEventListener("change", async 
   if (!file) return;
   try {
     const dataUrl = await fileToBase64(file);
-    await db.ref("settings/systemConfig/notifySound").set(dataUrl);
+    await offlineDb.ref("settings/systemConfig/notifySound").set(dataUrl);
     showToast("تم حفظ صوت الإشعارات بنجاح", "success");
     playNotifySound();
   } catch (err) { showToast("حدث خطأ أثناء رفع الصوت: " + err.message, "error"); }
@@ -1833,7 +1812,7 @@ document.getElementById("settingsNotifySound").addEventListener("change", async 
 document.getElementById("settingsTestSoundBtn").addEventListener("click", () => playNotifySound());
 
 document.getElementById("settingsResetSoundBtn").addEventListener("click", async () => {
-  await db.ref("settings/systemConfig/notifySound").remove();
+  await offlineDb.ref("settings/systemConfig/notifySound").remove();
   document.getElementById("settingsNotifySound").value = "";
   showToast("تم الرجوع لصوت التنبيه الافتراضي", "success");
 });
@@ -1844,13 +1823,13 @@ function highlightLangButtons(lang) {
 }
 
 document.getElementById("settingsLangAr").addEventListener("click", async () => {
-  await db.ref("settings/admin/lang").set("ar");
+  await offlineDb.ref("settings/admin/lang").set("ar");
   await loadAndApplyTheme("admin");
   highlightLangButtons("ar");
   showToast("تم التحويل للعربية", "success");
 });
 document.getElementById("settingsLangEn").addEventListener("click", async () => {
-  await db.ref("settings/admin/lang").set("en");
+  await offlineDb.ref("settings/admin/lang").set("en");
   await loadAndApplyTheme("admin");
   highlightLangButtons("en");
   showToast("Switched interface direction to English", "success");
@@ -1867,7 +1846,7 @@ document.getElementById("settingsSaveAdminBtn").addEventListener("click", async 
     const bgFile = document.getElementById("settingsAdminBg").files[0];
     if (logoFile) updates.logo = await compressBase64(await fileToBase64(logoFile), 300, 0.85);
     if (bgFile) updates.background = await compressBase64(await fileToBase64(bgFile), 1280, 0.7);
-    await db.ref("settings/admin").update(updates);
+    await offlineDb.ref("settings/admin").update(updates);
     showToast("تم حفظ ثيم لوحة الأدمن", "success");
     loadAndApplyTheme("admin");
   } catch (err) { showToast("حدث خطأ: " + err.message, "error"); }
@@ -1884,7 +1863,7 @@ document.getElementById("settingsSaveStudentBtn").addEventListener("click", asyn
     const bgFile = document.getElementById("settingsStudentBg").files[0];
     if (logoFile) updates.logo = await compressBase64(await fileToBase64(logoFile), 300, 0.85);
     if (bgFile) updates.background = await compressBase64(await fileToBase64(bgFile), 1280, 0.7);
-    await db.ref("settings/student").update(updates);
+    await offlineDb.ref("settings/student").update(updates);
     showToast("تم حفظ ثيم صفحة الطالب (هيظهر للطلاب فور فتح الصفحة)", "success");
   } catch (err) { showToast("حدث خطأ: " + err.message, "error"); }
 });
@@ -1897,7 +1876,7 @@ async function loadFinanceLedger() {
 
   attachFinanceRealtimeSync(); // بيرندر الجدول فوراً بالكاش الحالي لو موجود، وبيفضل محدّث تلقائياً بعد كده
 
-  const archSnap = await db.ref("financeArchive").get();
+  const archSnap = await offlineDb.ref("financeArchive").get();
   const sel = document.getElementById("ledgerArchiveSelect");
   sel.innerHTML = '<option value="">اختر شهر...</option>';
   if (archSnap.exists()) {
@@ -1921,11 +1900,11 @@ let financeRequestsCache = {};
 function attachFinanceRealtimeSync() {
   if (financeListenersAttached) return;
   financeListenersAttached = true;
-  db.ref("students").on("value", (snap) => {
+  offlineDb.ref("students").on("value", (snap) => {
     financeStudentsCache = snap.exists() ? snap.val() : {};
     refreshFinanceUI();
   });
-  db.ref("paymentRequests").on("value", (snap) => {
+  offlineDb.ref("paymentRequests").on("value", (snap) => {
     financeRequestsCache = snap.exists() ? snap.val() : {};
     refreshFinanceUI();
   });
@@ -1966,8 +1945,8 @@ function computeLedgerRowsSync(students, paymentRequests, monthKey) {
 /* نسخة async بتقرا البيانات مباشرة من القاعدة (بدون الاعتماد على الكاش) - للاستخدام
    لمرة واحدة زي تقرير الـ PDF الشامل، مش listener دائم */
 async function computeLedgerRows(monthKey) {
-  const studentsSnap = await db.ref("students").get();
-  const reqSnap = await db.ref("paymentRequests").get();
+  const studentsSnap = await offlineDb.ref("students").get();
+  const reqSnap = await offlineDb.ref("paymentRequests").get();
   return computeLedgerRowsSync(studentsSnap.exists() ? studentsSnap.val() : {}, reqSnap.exists() ? reqSnap.val() : {}, monthKey);
 }
 
@@ -1985,23 +1964,23 @@ function renderLedgerTable(rows) {
 
 // بنهاية كل شهر: أرشفة الشهر اللي فات وبدء عد جديد من الصفر تلقائياً أول ما الأدمن يفتح الإعدادات في الشهر الجديد
 async function archiveOldLedgerMonthIfNeeded(currentMonth) {
-  const snap = await db.ref("settings/financeLedgerMonth").get();
+  const snap = await offlineDb.ref("settings/financeLedgerMonth").get();
   const storedMonth = snap.exists() ? snap.val() : currentMonth;
   if (storedMonth === currentMonth) {
-    await db.ref("settings/financeLedgerMonth").set(currentMonth);
+    await offlineDb.ref("settings/financeLedgerMonth").set(currentMonth);
     return;
   }
   const oldRows = await computeLedgerRows(storedMonth);
   const total = oldRows.reduce((a, r) => a + r.amount, 0);
-  await db.ref("financeArchive/" + storedMonth).set({ rows: oldRows, total, archivedAt: new Date().toISOString() });
-  await db.ref("settings/financeLedgerMonth").set(currentMonth);
+  await offlineDb.ref("financeArchive/" + storedMonth).set({ rows: oldRows, total, archivedAt: new Date().toISOString() });
+  await offlineDb.ref("settings/financeLedgerMonth").set(currentMonth);
 }
 
 document.getElementById("ledgerArchiveSelect").addEventListener("change", async (e) => {
   const mk = e.target.value;
   const box = document.getElementById("ledgerArchiveResult");
   if (!mk) { box.innerHTML = ""; return; }
-  const snap = await db.ref("financeArchive/" + mk).get();
+  const snap = await offlineDb.ref("financeArchive/" + mk).get();
   if (!snap.exists()) { box.innerHTML = '<p class="empty-box">لا يوجد أرشيف لهذا الشهر</p>'; return; }
   const data = snap.val();
   box.innerHTML = `<div class="panel" style="background:var(--bg);"><p style="font-weight:800; margin-bottom:8px;">إجمالي ${escapeHtml(monthLabel(mk))}: ${data.total} ج</p>` +
@@ -2021,7 +2000,7 @@ document.getElementById("settingsGenTestBtn").addEventListener("click", async ()
     for (let i = 0; i < n; i++) {
       const code = await generateUniqueStudentId();
       const name = sampleNames[Math.floor(Math.random() * sampleNames.length)] + " (تجريبي " + code + ")";
-      await db.ref("students/" + code).set({
+      await offlineDb.ref("students/" + code).set({
         code, name, grade: "صف تجريبي", parentPhone: "0100000" + code,
         studentNumber: "", address: "حساب تجريبي", subjects: {}, grades: {}, attendance: {}, notes: {}, payments: {},
         createdAt: new Date().toISOString(), isTestAccount: true,
@@ -2054,15 +2033,15 @@ document.getElementById("factoryResetConfirmBtn").addEventListener("click", asyn
   try {
     // حذف شامل لكل بيانات النظام (مش بس الطلاب) عشان الموقع يرجع لحالته الأولى تماماً
     await Promise.all([
-      db.ref("students").remove(),
-      db.ref("teachers").remove(),
-      db.ref("absentees").remove(),
-      db.ref("paymentRequests").remove(),
-      db.ref("financeArchive").remove(),
-      db.ref("supportChats").remove(),
-      db.ref("stats").remove(),
-      db.ref("presence").remove(),
-      db.ref("systemBackups").remove(),
+      offlineDb.ref("students").remove(),
+      offlineDb.ref("teachers").remove(),
+      offlineDb.ref("absentees").remove(),
+      offlineDb.ref("paymentRequests").remove(),
+      offlineDb.ref("financeArchive").remove(),
+      offlineDb.ref("supportChats").remove(),
+      offlineDb.ref("stats").remove(),
+      offlineDb.ref("presence").remove(),
+      offlineDb.ref("systemBackups").remove(),
     ]);
     showToast("تم حذف كل بيانات النظام - الموقع رجع لحالته الأولى", "success");
     document.getElementById("factoryResetModal").classList.add("hidden");
@@ -2077,7 +2056,7 @@ document.getElementById("factoryResetConfirmBtn").addEventListener("click", asyn
 });
 
 document.getElementById("settingsOpenDeleteOneBtn").addEventListener("click", async () => {
-  const snap = await db.ref("students").get();
+  const snap = await offlineDb.ref("students").get();
   studentsCache = snap.exists() ? snap.val() : {};
   renderDeleteOneList(studentsCache);
   document.getElementById("deleteOneModal").classList.remove("hidden");
@@ -2105,7 +2084,7 @@ function renderDeleteOneList(students) {
     delBtn.addEventListener("click", async (e) => {
       e.stopPropagation();
       if (!confirm(`تأكيد حذف الطالب ${s.name}؟`)) return;
-      await db.ref("students/" + code).remove();
+      await offlineDb.ref("students/" + code).remove();
       showToast("تم حذف الطالب", "success");
       delete studentsCache[code];
       renderDeleteOneList(studentsCache);

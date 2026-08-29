@@ -740,3 +740,7 @@ body.lang-en .topbar-brand{ text-align: left; }
   body.print-full-report .report-print-area thead{ display: table-header-group; } /* تكرار رأس الجدول في كل صفحة جديدة */
   body.print-full-report .report-print-area .r-section{ page-break-inside: auto; }
 }
+
+
+/* Local-first / Offline sync indicator */
+.offline-sync{position:fixed;bottom:12px;left:12px;z-index:99999;padding:8px 12px;border-radius:999px;font-size:12px;font-weight:800;box-shadow:0 4px 18px rgba(0,0,0,.12);background:#fff;color:#344054;direction:rtl}.offline-sync.online{border:1px solid #b7ebc6}.offline-sync.offline{border:1px solid #ffd6a5}.offline-sync.pending{border:1px solid #f4c95d}

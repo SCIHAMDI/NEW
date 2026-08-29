@@ -119,7 +119,7 @@ if (!studentCode) {
 
 async function loadStudent(code) {
   try {
-    const snap = await db.ref("students/" + code).get();
+    const snap = await offlineDb.ref("students/" + code).get();
     if (!snap.exists()) {
       document.getElementById("loadingBox").classList.add("hidden");
       document.getElementById("notFoundBox").classList.remove("hidden");
@@ -395,7 +395,7 @@ document.getElementById("payForm").addEventListener("submit", async (e) => {
     // ضغط الصورة وتقليل حجمها تلقائياً قبل الرفع
     const compressedImage = await compressBase64(uploadedImageDataUrl, 600, 0.6);
 
-    await db.ref("paymentRequests").push({
+    await offlineDb.ref("paymentRequests").push({
       code: currentCode,
       name: currentStudent.name,
       billingKey: opt.value, // مفتاح المادة/المدرس - لازم لتحديث دورة الاشتراك 30 يوم عند الموافقة
@@ -458,7 +458,7 @@ if (supportFab) {
 function attachSupportListener() {
   if (supportListenerAttached || !currentCode) return;
   supportListenerAttached = true;
-  db.ref("supportChats/" + currentCode + "/messages").on("value", (snap) => {
+  offlineDb.ref("supportChats/" + currentCode + "/messages").on("value", (snap) => {
     const wrap = document.getElementById("sp_messages");
     if (!snap.exists()) { wrap.innerHTML = '<p style="color:var(--text-light); font-size:12.5px; text-align:center;">اكتب استفسارك وهيتم الرد عليك من الإدارة قريباً</p>'; return; }
     const msgs = Object.values(snap.val()).sort((a, b) => (a.at || 0) - (b.at || 0));
@@ -474,7 +474,7 @@ async function sendSupportMessage() {
   const input = document.getElementById("sp_input");
   const text = input.value.trim();
   if (!text) return;
-  await db.ref(`supportChats/${currentCode}/messages`).push({ text, from: "student", at: Date.now() });
-  await db.ref(`supportChats/${currentCode}`).update({ studentName: currentStudent.name, lastAt: Date.now() });
+  await offlineDb.ref(`supportChats/${currentCode}/messages`).push({ text, from: "student", at: Date.now() });
+  await offlineDb.ref(`supportChats/${currentCode}`).update({ studentName: currentStudent.name, lastAt: Date.now() });
   input.value = "";
 }

@@ -18,7 +18,7 @@ const ALL_DB_NODES = ["students", "teachers", "absentees", "paymentRequests", "f
 
 /* جلب كل بيانات النظام من كل العقد المعروفة دفعة واحدة */
 async function fetchAllData() {
-  const snapshots = await Promise.all(ALL_DB_NODES.map((node) => db.ref(node).get()));
+  const snapshots = await Promise.all(ALL_DB_NODES.map((node) => offlineDb.ref(node).get()));
   const data = {};
   ALL_DB_NODES.forEach((node, i) => {
     data[node] = snapshots[i].exists() ? snapshots[i].val() : null;
@@ -73,16 +73,16 @@ async function exportJsonBackup() {
    بآخر MAX_SAVED_BACKUPS نسخ بس وحذف الأقدم تلقائياً عشان الحجم ميكبرش من غير داعي */
 async function saveBackupToSystem(payload) {
   const id = String(Date.now());
-  await db.ref("systemBackups/" + id).set(payload);
+  await offlineDb.ref("systemBackups/" + id).set(payload);
 
-  const snap = await db.ref("systemBackups").get();
+  const snap = await offlineDb.ref("systemBackups").get();
   if (!snap.exists()) return;
   const ids = Object.keys(snap.val()).sort(); // الأقدم أولاً (المفاتيح أرقام زمنية)
   const excess = ids.length - MAX_SAVED_BACKUPS;
   if (excess > 0) {
     const updates = {};
     ids.slice(0, excess).forEach((oldId) => (updates[oldId] = null));
-    await db.ref("systemBackups").update(updates);
+    await offlineDb.ref("systemBackups").update(updates);
   }
   loadSavedBackupsList();
 }
@@ -92,7 +92,7 @@ async function loadSavedBackupsList() {
   const wrap = document.getElementById("savedBackupsList");
   const empty = document.getElementById("savedBackupsEmpty");
   try {
-    const snap = await db.ref("systemBackups").get();
+    const snap = await offlineDb.ref("systemBackups").get();
     const backups = snap.exists() ? snap.val() : {};
     const ids = Object.keys(backups).sort().reverse(); // الأحدث أولاً
     wrap.innerHTML = "";
@@ -113,7 +113,7 @@ async function loadSavedBackupsList() {
       row.querySelector("[data-restore]").addEventListener("click", () => openImportConfirm(b.data, `النسخة المحفوظة بتاريخ ${formatDateArabic(b.exportedAt)} - ${formatTimeArabic(b.exportedAt)}`));
       row.querySelector("[data-delete]").addEventListener("click", async () => {
         if (!confirm("حذف هذه النسخة الاحتياطية المحفوظة نهائياً؟ (الملف اللي نزّلته على جهازك مش هيتأثر)")) return;
-        await db.ref("systemBackups/" + id).remove();
+        await offlineDb.ref("systemBackups/" + id).remove();
         loadSavedBackupsList();
       });
       wrap.appendChild(row);
@@ -178,7 +178,7 @@ document.getElementById("importBackupConfirmBtn").addEventListener("click", asyn
   try {
     const writes = ALL_DB_NODES
       .filter((node) => Object.prototype.hasOwnProperty.call(pendingImportData, node))
-      .map((node) => db.ref(node).set(pendingImportData[node]));
+      .map((node) => offlineDb.ref(node).set(pendingImportData[node]));
     await Promise.all(writes);
     showToast("تم استعادة النسخة الاحتياطية بنجاح", "success");
     document.getElementById("importBackupModal").classList.add("hidden");
