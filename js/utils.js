@@ -37,6 +37,10 @@ function formatTimeArabic(d) {
   return date.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function todayKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

@@ -42,7 +42,7 @@ body{
   direction: rtl;
   min-height: 100vh;
   width: 100%;
-  overflow-x: hidden; /* حماية إضافية: يمنع ظهور الموقع بعرض شاشة كمبيوتر على الموبايل لو أي عنصرفاض عرضياً بالغلط */
+  overflow-x: hidden; /* حماية إضافية: يمنع ظهور الموقع بعرض شاشة كمبيوتر على الموبايل لو أي عنصر فاض عرضياً بالغلط */
   -webkit-font-smoothing: antialiased;
 }
 
@@ -655,12 +655,52 @@ body.lang-en .topbar-brand{ text-align: left; }
     box-shadow:none !important; border-radius:0 !important;
     page-break-after: always;
   }
+  /* نفس إصلاح القص اللي اتعمل للتقرير الشامل: المودال (.modal-overlay بالذات عنده
+     backdrop-filter وده بيكسر خاصية position:fixed العادية للعناصر جواه في المتصفح -
+     يعني الكارت كان بيتقص/يختفي جزء منه بدل ما يظهر كامل وقت الطباعة) */
+  body.print-id-card .modal-overlay{
+    position:static !important; inset:auto !important; background:none !important;
+    padding:0 !important; backdrop-filter:none !important; display:block !important;
+  }
+  body.print-id-card .modal-box{
+    max-width:none !important; max-height:none !important; width:auto !important;
+    box-shadow:none !important; border-radius:0 !important; display:block !important;
+  }
+  body.print-id-card .modal-body{
+    padding:0 !important; overflow:visible !important; max-height:none !important;
+  }
+  body.print-id-card .modal-head,
+  body.print-id-card .modal-body > p,
+  body.print-id-card #printStudentCardBtn{
+    display:none !important;
+  }
 
   /* التقرير الشامل بكل البيانات */
   body.print-full-report #fullReportPrintArea,
   body.print-full-report #fullReportPrintArea *{ visibility:visible !important; }
   body.print-full-report #fullReportPrintArea{
     position:static; margin:0; padding:0; background:#fff !important;
+  }
+
+  /* إصلاح القص عند الطباعة: المودال نفسه (.modal-overlay/.modal-box/.modal-body) كان
+     لسه محتفظ بـ position:fixed و max-height وscroll داخلي حتى في وضع الطباعة، فكان
+     بيقص أي حاجة برة الجزء الظاهر على الشاشة فقط (~4 صفوف) - دلوقتي بنحررهم بالكامل
+     عشان الجدول الطويل يفرد على كل الصفحات المطبوعة من غير ما يتقطع */
+  body.print-full-report .modal-overlay{
+    position:static !important; inset:auto !important; background:none !important;
+    padding:0 !important; backdrop-filter:none !important; display:block !important;
+  }
+  body.print-full-report .modal-box{
+    max-width:none !important; max-height:none !important; width:auto !important;
+    box-shadow:none !important; border-radius:0 !important; display:block !important;
+  }
+  body.print-full-report .modal-body{
+    padding:0 !important; overflow:visible !important; max-height:none !important;
+  }
+  body.print-full-report .modal-head,
+  body.print-full-report .modal-body > p,
+  body.print-full-report #printFullReportBtn{
+    display:none !important;
   }
 }
 /* مقاس الصفحة بيتظبط ديناميكياً بالجافاسكريبت حسب نوع الطباعة (كارت صغير أو تقرير A4) */
@@ -675,7 +715,7 @@ body.lang-en .topbar-brand{ text-align: left; }
 .report-print-area .r-header{ text-align:center; margin-bottom:18px; border-bottom:3px solid #1c3f8c; padding-bottom:12px; }
 .report-print-area .r-header h1{ font-size:20px; font-weight:900; color:#1c3f8c; margin-bottom:4px; }
 .report-print-area .r-header p{ font-size:11px; color:#666; }
-.report-print-area .r-section{ margin-bottom:22px; page-break-inside: avoid; }
+.report-print-area .r-section{ margin-bottom:22px; }
 .report-print-area .r-section h2{
   font-size:14px; font-weight:800; background:#eef1fb; color:#1c3f8c;
   padding:6px 10px; border-radius:6px; margin-bottom:8px; border-right:4px solid #1c3f8c;
@@ -690,39 +730,10 @@ body.lang-en .topbar-brand{ text-align: left; }
 .report-print-area .r-empty{ font-size:11.5px; color:#999; padding:6px 0; }
 
 @media print{
-  body.print-full-report,
-  body.print-full-report html,
-  body.print-full-report .modal-overlay,
-  body.print-full-report .modal-box,
-  body.print-full-report .modal-body,
-  body.print-full-report #fullReportPrintArea,
-  body.print-full-report .report-print-area {
-    height: auto !important;
-    max-height: none !important;
-    overflow: visible !important;
-    overflow-y: visible !important;
-    position: static !important;
-  }
-
-  body.print-full-report .report-print-area{ border:none; padding:0; }
-  
-  body.print-full-report .modal-overlay {
-    background: transparent !important;
-    padding: 0 !important;
-    display: block !important;
-  }
-  
-  body.print-full-report .modal-box {
-    box-shadow: none !important;
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  body.print-full-report thead {
-    display: table-header-group;
-  }
-
-  body.print-full-report tr {
-    page-break-inside: avoid;
-  }
+  body.print-full-report .report-print-area{ max-height:none; overflow:visible; border:none; padding:0; }
+  /* السماح بفصل الجدول عبر عدة صفحات بدل ما يتقطع أو يتقص - وكل صف يفضل كامل جوه نفس الصفحة */
+  body.print-full-report .report-print-area table{ page-break-inside: auto; }
+  body.print-full-report .report-print-area tr{ page-break-inside: avoid; break-inside: avoid; }
+  body.print-full-report .report-print-area thead{ display: table-header-group; } /* تكرار رأس الجدول في كل صفحة جديدة */
+  body.print-full-report .report-print-area .r-section{ page-break-inside: auto; }
 }

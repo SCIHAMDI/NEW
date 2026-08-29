@@ -6,12 +6,31 @@
    البيانات هو فقط "الوصف الرقمي" للوجه (face descriptor - مصفوفة من 128 رقم)
    ومينفعش ترجعه لصورة تاني، فهو مشابه من ناحية الخصوصية لأي بصمة تانية.
 
-   لازم تضيف السكريبت ده قبل js/face.js في أي صفحة هتستخدمه:
-   <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+   تحسين أداء: المكتبة نفسها (face-api.js) بقت بتتحمّل ديناميكياً هنا أول مرة
+   حد يستخدم أي خاصية بصمة وجه فعلياً (مش تاج <script> ثابت في كل صفحة)، عشان
+   الأدمن اللي مش بيستخدم بصمة الوجه في جلسته منزلش المكتبة دي أصلاً (حجمها
+   مش قليل) - ده بيسرّع تحميل باقي الصفحة لأي حد.
    ========================================================== */
 
+const FACE_API_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js";
 const FACE_MODELS_URL = "https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@master/weights";
 const FACE_MATCH_THRESHOLD = 0.45; // كل ما قل الرقم كل ما كانت المطابقة أدق وأصعب (بتقلل نسبة الخطأ في التعرف على طالب غلط)
+
+let faceApiScriptLoading = null;
+
+/* تحميل مكتبة face-api.js نفسها ديناميكياً (مرة واحدة بس) لو لسه مش محمّلة */
+function loadFaceApiScript() {
+  if (typeof faceapi !== "undefined") return Promise.resolve(true);
+  if (faceApiScriptLoading) return faceApiScriptLoading;
+  faceApiScriptLoading = new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = FACE_API_SCRIPT_URL;
+    script.onload = () => resolve(true);
+    script.onerror = () => { console.error("فشل تحميل مكتبة face-api.js"); resolve(false); };
+    document.head.appendChild(script);
+  });
+  return faceApiScriptLoading;
+}
 
 let faceModelsLoaded = false;
 let faceModelsLoading = null;
@@ -20,10 +39,13 @@ let faceModelsLoading = null;
 async function loadFaceModels() {
   if (faceModelsLoaded) return true;
   if (faceModelsLoading) return faceModelsLoading;
-  if (typeof faceapi === "undefined") {
-    console.warn("مكتبة face-api.js مش متحمّلة - تأكد من إضافة السكريبت في الصفحة");
+
+  const scriptOk = await loadFaceApiScript();
+  if (!scriptOk || typeof faceapi === "undefined") {
+    console.warn("مكتبة face-api.js مش متحمّلة");
     return false;
   }
+
   faceModelsLoading = (async () => {
     try {
       await Promise.all([

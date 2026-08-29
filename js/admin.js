@@ -55,12 +55,8 @@ function attachBadgeListeners() {
   if (badgeListenersAttached) return;
   badgeListenersAttached = true;
 
-  // شارة "المصروفات": عدد طلبات الدفع الأونلاين قيد المراجعة
-  db.ref("paymentRequests").on("value", (snap) => {
-    const all = snap.exists() ? snap.val() : {};
-    const pending = Object.values(all).filter((r) => r && r.status === "pending").length;
-    updateTabBadge("payments", pending);
-  });
+  // شارة "المصروفات": بيتحدث من نفس الاشتراك المباشر جوه loadPaymentRequests() -
+  // بدل اشتراك منفصل تاني بيعيد تحميل نفس بيانات طلبات الدفع من الصفر (تحسين أداء)
 
   // شارة "الغائبين": بيتحدث من نفس الاشتراك المباشر في absenteesListenerRef (attachAbsenteesListener)
   // اللي بيتنقل تلقائياً لمسار اليوم الجديد كل 24 ساعة - شوف renderAbsenteesList()
@@ -561,16 +557,9 @@ function attachLiveOverviewListeners() {
   db.ref("stats/pageViews").on("value", (s) => {
     document.getElementById("ov_pageViews").textContent = s.val() || 0;
   });
-  // إجمالي المبالغ المحصّلة هذا الشهر - تحديث مباشر (نفس المصدر المستخدم في "سجل المصاريف")
-  const updateCollectedTotal = () => {
-    const box = document.getElementById("ov_collectedTotal");
-    if (!box) return;
-    computeLedgerRows(currentMonthKey()).then((rows) => {
-      box.textContent = rows.reduce((a, r) => a + r.amount, 0) + " ج";
-    });
-  };
-  db.ref("students").on("value", updateCollectedTotal);
-  db.ref("paymentRequests").on("value", updateCollectedTotal);
+  // إجمالي المبالغ المحصّلة هذا الشهر - بيتحدث عن طريق attachFinanceRealtimeSync() (تحسين أداء:
+  // listener واحد مشترك بدل ما كل شاشة تعمل اشتراك منفصل في نفس بيانات الطلاب/الطلبات)
+  attachFinanceRealtimeSync();
 }
 
 function isStudentPaidThisMonth(student) {
@@ -1262,6 +1251,9 @@ async function loadPaymentRequests() {
       wrap.innerHTML = "";
       const all = snap.exists() ? snap.val() : {};
       const requests = Object.fromEntries(Object.entries(all).filter(([, r]) => r && r.status === "pending"));
+      // تحسين أداء: تحديث شارة "المصروفات" من نفس البيانات اللي وصلت من الـ listener ده
+      // بدل ما يكون فيه اشتراك تاني منفصل بيعيد تحميل نفس المجموعة تاني من الصفر
+      updateTabBadge("payments", Object.keys(requests).length);
       if (!Object.keys(requests).length) { empty.classList.remove("hidden"); return; }
       empty.classList.add("hidden");
 
@@ -1611,12 +1603,27 @@ document.getElementById("ab_sendAllBtn").addEventListener("click", async () => {
   const today = todayKey();
   const pending = Object.entries(absenteesCache).filter(([, a]) => a.status !== "sent");
   if (!pending.length) return showToast("لا يوجد غائبين محتاجين إرسال حالياً", "success");
-  if (!confirm(`هيتم فتح ${pending.length} نافذة واتساب واحدة تلو الأخرى، متابعة؟ (المتصفح ممكن يمنع فتح أكتر من نافذة تلقائياً - في الحالة دي ابعتهم واحد واحد)`)) return;
-  for (const [code, a] of pending) {
+
+  const GAP_MS = 72000; // فاصل زمني 1.2 دقيقة (72 ثانية) بين كل رسالة والتانية
+  const estMinutes = Math.ceil((pending.length - 1) * 1.2);
+  if (!confirm(`هيتم إرسال ${pending.length} رسالة واتساب، رسالة كل 1.2 دقيقة (المفروض ياخد حوالي ${estMinutes} دقيقة). سيب الصفحة مفتوحة لحد ما يخلص. متابعة؟`)) return;
+
+  const btn = document.getElementById("ab_sendAllBtn");
+  const originalText = btn.textContent;
+  btn.disabled = true;
+
+  for (let i = 0; i < pending.length; i++) {
+    const [code, a] = pending[i];
+    btn.textContent = `📱 جاري الإرسال (${i + 1} / ${pending.length})...`;
     const msg = `تنبيه غياب: الطالب ${a.name} لم يحضر معاده اليوم (${a.time}) في Al Ola Center`;
     sendWhatsApp(a.phone, msg);
     await db.ref(`absentees/${today}/${code}/status`).set("sent");
+    if (i < pending.length - 1) await sleep(GAP_MS);
   }
+
+  btn.disabled = false;
+  btn.textContent = originalText;
+  showToast("تم إرسال كل الرسائل", "success");
 });
 document.getElementById("ab_deleteAllBtn").addEventListener("click", async () => {
   const today = todayKey();
@@ -1814,31 +1821,12 @@ document.getElementById("settingsSaveStudentBtn").addEventListener("click", asyn
 });
 
 /* ---------- سجل المصاريف الإجمالي + الأرشفة الشهرية ---------- */
-let ledgerListenersAttached = false;
-
 async function loadFinanceLedger() {
   const monthKey = currentMonthKey();
   document.getElementById("ledgerMonthLabel").textContent = monthLabel(monthKey);
   await archiveOldLedgerMonthIfNeeded(monthKey);
 
-  // تحديث فوري أول مرة
-  const rows = await computeLedgerRows(monthKey);
-  renderLedgerTable(rows);
-
-  // إصلاح: "المبالغ مش بتنضاف في كارت إجمالي الشهر" - بدل ما نحسب مرة واحدة بس عند فتح
-  // التاب، بنعمل استماع دائم (realtime) على students و paymentRequests عشان أي عملية دفع
-  // (سواء من تبويب المصروفات أو موافقة على طلب أونلاين) تحدّث الإجمالي فوراً تلقائياً
-  if (!ledgerListenersAttached) {
-    ledgerListenersAttached = true;
-    db.ref("students").on("value", () => {
-      const mk = currentMonthKey();
-      computeLedgerRows(mk).then(renderLedgerTable);
-    });
-    db.ref("paymentRequests").on("value", () => {
-      const mk = currentMonthKey();
-      computeLedgerRows(mk).then(renderLedgerTable);
-    });
-  }
+  attachFinanceRealtimeSync(); // بيرندر الجدول فوراً بالكاش الحالي لو موجود، وبيفضل محدّث تلقائياً بعد كده
 
   const archSnap = await db.ref("financeArchive").get();
   const sel = document.getElementById("ledgerArchiveSelect");
@@ -1850,29 +1838,68 @@ async function loadFinanceLedger() {
   }
 }
 
-async function computeLedgerRows(monthKey) {
+/* ==========================================================
+   تحسين أداء: بدل ما "الإجمالي في الرئيسية" و"سجل المصاريف" كل واحدة تعمل
+   اشتراك (listener) منفصل في students/paymentRequests وتقرا البيانات كاملة تاني
+   من غير داعي في كل مرة، بقى فيه اشتراك واحد بس مشترك بين الاتنين، وبيستخدم
+   البيانات اللي الـ listener بيوصله بالفعل بدل ما يعمل قراءة إضافية زيادة.
+   ده بيقلل حمل قاعدة البيانات بشكل كبير خصوصاً مع زيادة عدد الطلاب.
+   ========================================================== */
+let financeListenersAttached = false;
+let financeStudentsCache = {};
+let financeRequestsCache = {};
+
+function attachFinanceRealtimeSync() {
+  if (financeListenersAttached) return;
+  financeListenersAttached = true;
+  db.ref("students").on("value", (snap) => {
+    financeStudentsCache = snap.exists() ? snap.val() : {};
+    refreshFinanceUI();
+  });
+  db.ref("paymentRequests").on("value", (snap) => {
+    financeRequestsCache = snap.exists() ? snap.val() : {};
+    refreshFinanceUI();
+  });
+}
+
+/* بيحدث أي عنصر واجهة معروض حالياً (كارت الإجمالي في الرئيسية و/أو جدول سجل المصاريف)
+   من غير أي قراءة إضافية من قاعدة البيانات - كل البيانات جاهزة في الكاش بالفعل */
+function refreshFinanceUI() {
+  const monthKey = currentMonthKey();
+  const rows = computeLedgerRowsSync(financeStudentsCache, financeRequestsCache, monthKey);
+
+  const totalBox = document.getElementById("ov_collectedTotal");
+  if (totalBox) totalBox.textContent = rows.reduce((a, r) => a + r.amount, 0) + " ج";
+
+  const ledgerTable = document.getElementById("ledgerTable");
+  if (ledgerTable) renderLedgerTable(rows);
+}
+
+function computeLedgerRowsSync(students, paymentRequests, monthKey) {
   const rows = [];
-  const studentsSnap = await db.ref("students").get();
-  const students = studentsSnap.exists() ? studentsSnap.val() : {};
-  Object.values(students).forEach((s) => {
+  Object.values(students || {}).forEach((s) => {
     const payments = (s.payments || {})[monthKey] || {};
-    // إصلاح: نحسب كل مادة/مدرس مرة واحدة بس في السجل (مش مرة لكل مجموعة مرتبطة بنفس المدرس)
-    // وإلا هيتكرر نفس المبلغ 2 أو 3 مرات لو الطالب مسجل في أكتر من مجموعة لنفس المدرس
+    // كل مادة/مدرس بتتحسب مرة واحدة بس في السجل (مش مرة لكل مجموعة مرتبطة بنفس المدرس)
     const billingGroups = getBillingGroups(s.subjects);
     billingGroups.forEach((g) => {
       if (!isBillingGroupPaid(g, payments)) return;
-      const amount = parseFloat(g.fee) || 0;
-      rows.push({ student: s.name, subject: g.name, amount, type: "عادي" });
+      rows.push({ student: s.name, subject: g.name, amount: parseFloat(g.fee) || 0, type: "عادي" });
     });
   });
-  const reqSnap = await db.ref("paymentRequests").get();
-  const allReqs = reqSnap.exists() ? reqSnap.val() : {};
-  Object.values(allReqs).forEach((r) => {
+  Object.values(paymentRequests || {}).forEach((r) => {
     if (r && r.status === "approved" && r.month === monthKey) {
       rows.push({ student: r.name, subject: r.subjectName || "-", amount: parseFloat(r.amount) || 0, type: "أونلاين" });
     }
   });
   return rows;
+}
+
+/* نسخة async بتقرا البيانات مباشرة من القاعدة (بدون الاعتماد على الكاش) - للاستخدام
+   لمرة واحدة زي تقرير الـ PDF الشامل، مش listener دائم */
+async function computeLedgerRows(monthKey) {
+  const studentsSnap = await db.ref("students").get();
+  const reqSnap = await db.ref("paymentRequests").get();
+  return computeLedgerRowsSync(studentsSnap.exists() ? studentsSnap.val() : {}, reqSnap.exists() ? reqSnap.val() : {}, monthKey);
 }
 
 function renderLedgerTable(rows) {
