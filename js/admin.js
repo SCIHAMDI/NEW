@@ -74,6 +74,36 @@ function attachBadgeListeners() {
   });
 }
 
+/* ==========================================================
+   تثبيت لوحة الأدمن كتطبيق على سطح المكتب (PWA)
+   ========================================================== */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("admin-sw.js").catch((e) => console.warn("تعذر تسجيل Service Worker:", e));
+  });
+}
+
+let deferredInstallPrompt = null;
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault(); // منع النافذة التلقائية اللي بيقترحها المتصفح، وإظهار زرارنا الخاص بدل منها
+  deferredInstallPrompt = e;
+  document.getElementById("installAppBtn").classList.remove("hidden");
+});
+
+document.getElementById("installAppBtn").addEventListener("click", async () => {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  const { outcome } = await deferredInstallPrompt.userChoice;
+  if (outcome === "accepted") showToast("تم تثبيت التطبيق بنجاح - هتلاقيه على سطح المكتب", "success");
+  deferredInstallPrompt = null;
+  document.getElementById("installAppBtn").classList.add("hidden");
+});
+
+// لو التطبيق اتثبت بالفعل، إخفاء الزرار (مفيش داعي نعرضه تاني)
+window.addEventListener("appinstalled", () => {
+  document.getElementById("installAppBtn").classList.add("hidden");
+});
+
 async function init() {
   trackPresence("admin");
   await loadAndApplyTheme("admin");
@@ -565,9 +595,26 @@ function attachLiveOverviewListeners() {
 function isStudentPaidThisMonth(student) {
   const billingGroups = getBillingGroups(student.subjects);
   if (!billingGroups.length) return { paid: true, unpaidSubjects: [] };
+  // إصلاح الثغرة: التحقق دلوقتي بيعتمد على دورة الاشتراك الفعلية (30 يوم من تاريخ آخر
+  // دفعة حقيقية)، مش على تصفير تلقائي مع أول كل شهر ميلادي - يعني لو الطالب دفع يوم 20
+  // في الشهر، الاشتراك بيفضل ساري لحد يوم 20 من الشهر اللي بعده، مش بيتصفر يوم 1
+  const subscriptionDates = student.subscriptionDates || {};
   const monthKey = currentMonthKey();
-  const payments = (student.payments || {})[monthKey] || {};
-  const unpaidSubjects = billingGroups.filter((g) => !isBillingGroupPaid(g, payments)).map((g) => ({ key: g.billingKey, name: g.name }));
+  const monthPayments = (student.payments || {})[monthKey] || {};
+
+  const unpaidSubjects = billingGroups
+    .filter((g) => {
+      const lastPaid = subscriptionDates[g.billingKey];
+      if (lastPaid) {
+        const daysLeft = getSubscriptionDaysRemaining(lastPaid);
+        return daysLeft === null || daysLeft <= 0; // الاشتراك خلص
+      }
+      // توافق مع الطلاب اللي دفعوا قبل هذا التحديث (لسه مفيش تاريخ اشتراك مسجل ليهم):
+      // نرجع مؤقتاً لفحص دفع الشهر الحالي بالطريقة القديمة عشان مانوقفش حضور طالب
+      // كان مدفوع أصلاً - أول ما يجدد دفعه هيتسجله تلقائياً بالنظام الجديد
+      return !isBillingGroupPaid(g, monthPayments);
+    })
+    .map((g) => ({ key: g.billingKey, name: g.name }));
   return { paid: unpaidSubjects.length === 0, unpaidSubjects };
 }
 
@@ -1190,15 +1237,25 @@ function renderPaymentSubjects(code, student, monthKey) {
   noSubjects.classList.add("hidden");
 
   const payments = (student.payments || {})[monthKey] || {};
+  const subscriptionDates = student.subscriptionDates || {};
   const isPastMonth = monthKey < currentMonthKey(); // الشهور اللي فاتت تُعرض للمراجعة بس، مش قابلة للتعديل
 
   billingGroups.forEach((g) => {
     const isPaid = isBillingGroupPaid(g, payments);
     const locked = isPaid || isPastMonth;
     const groupsCountNote = g.subjectKeys.length > 1 ? ` <span style="color:var(--text-light); font-weight:400;">(${g.subjectKeys.length} مجموعات مربوطة - بتتحسب مرة واحدة)</span>` : "";
+
+    // دورة الاشتراك 30 يوم من تاريخ آخر دفعة فعلية (مش من أول الشهر الميلادي)
+    const sub = formatSubscriptionStatus(subscriptionDates[g.billingKey]);
+    const subClass = { active: "success", due: "pending", overdue: "danger", never: "" }[sub.state];
+    const subBadge = sub.state ? `<div style="margin-top:6px; font-size:12px; font-weight:700;" class="${subClass ? "text-" + subClass : ""}">📅 ${escapeHtml(sub.text)}</div>` : "";
+
     const row = el(`
       <div class="pay-row">
-        <div class="info"><b>${escapeHtml(g.name)}</b>${escapeHtml(g.fee || 0)} جنيه - ${escapeHtml(g.day || "")}${groupsCountNote} ${isPaid ? '<span class="badge success" style="margin-right:6px;">مؤكد ومقفول 🔒</span>' : isPastMonth ? '<span class="badge pending" style="margin-right:6px;">لم يُدفع (شهر سابق)</span>' : ""}</div>
+        <div class="info">
+          <b>${escapeHtml(g.name)}</b>${escapeHtml(g.fee || 0)} جنيه - ${escapeHtml(g.day || "")}${groupsCountNote} ${isPaid ? '<span class="badge success" style="margin-right:6px;">مؤكد ومقفول 🔒</span>' : isPastMonth ? '<span class="badge pending" style="margin-right:6px;">لم يُدفع (شهر سابق)</span>' : ""}
+          ${subBadge}
+        </div>
         <div class="pay-toggle">
           <button type="button" class="yes ${isPaid ? "active" : ""}" data-yes ${locked ? "disabled" : ""}>✓</button>
           <button type="button" class="no ${!isPaid ? "active" : ""}" data-no ${locked ? "disabled" : ""}>✗</button>
@@ -1210,13 +1267,18 @@ function renderPaymentSubjects(code, student, monthKey) {
       // وبيتطبق على كل المجموعات المرتبطة بنفس المدرس/المادة لنفس الشهر مرة واحدة تلقائياً
       const updates = {};
       g.subjectKeys.forEach((k) => (updates[k] = true));
-      await db.ref(`students/${code}/payments/${monthKey}`).update(updates);
+      const nowISO = new Date().toISOString();
+      await Promise.all([
+        db.ref(`students/${code}/payments/${monthKey}`).update(updates),
+        // بداية دورة اشتراك جديدة 30 يوم من النهاردة بالظبط (مش من أول الشهر الجاي)
+        db.ref(`students/${code}/subscriptionDates/${g.billingKey}`).set(nowISO),
+      ]);
       row.querySelector("[data-yes]").classList.add("active");
       row.querySelector("[data-yes]").disabled = true;
       row.querySelector("[data-no]").classList.remove("active");
       row.querySelector("[data-no]").disabled = true;
-      const msg = `تم تأكيد دفع مصاريف "${g.name}" لشهر ${monthLabel(monthKey)} للطالب ${student.name} - Al Ola Center. شكراً لكم.`;
-      showToast("تم تسجيل الدفع وقفل التأكيد", "success");
+      const msg = `تم تأكيد دفع مصاريف "${g.name}" لشهر ${monthLabel(monthKey)} للطالب ${student.name} - Al Ola Center. الاشتراك ساري لمدة 30 يوم من النهاردة. شكراً لكم.`;
+      showToast("تم تسجيل الدفع - الاشتراك ساري 30 يوم من النهاردة", "success");
       playNotifySound();
       loadOverview();
       const waSlot = el('<div style="margin-top:8px;"></div>');
@@ -1280,12 +1342,19 @@ async function loadPaymentRequests() {
           // بيدعم subjectKeys (مصفوفة - كل المجموعات المرتبطة بنفس المدرس/المادة) وكمان subjectKey
           // القديمة (توافقاً مع أي طلبات اتبعتت قبل هذا التحديث)
           const keysToMark = Array.isArray(r.subjectKeys) && r.subjectKeys.length ? r.subjectKeys : (r.subjectKey ? [r.subjectKey] : []);
+          const writes = [];
           if (keysToMark.length) {
             const updates = {};
             keysToMark.forEach((k) => (updates[k] = true));
-            await db.ref(`students/${r.code}/payments/${r.month}`).update(updates);
+            writes.push(db.ref(`students/${r.code}/payments/${r.month}`).update(updates));
           }
-          await db.ref(`paymentRequests/${reqId}`).update({ status: "approved", amount });
+          // بداية دورة اشتراك جديدة 30 يوم من النهاردة (لو الطلب فيه billingKey - الطلبات
+          // القديمة قبل هذا التحديث مش هيبقى فيها الحقل ده، فهتفضل شغالة بالنظام القديم بس)
+          if (r.billingKey) {
+            writes.push(db.ref(`students/${r.code}/subscriptionDates/${r.billingKey}`).set(new Date().toISOString()));
+          }
+          writes.push(db.ref(`paymentRequests/${reqId}`).update({ status: "approved", amount }));
+          await Promise.all(writes);
           playNotifySound();
           showToast("تم تأكيد الدفع", "success");
           const msg = `تم تأكيد دفع مصاريف "${r.subjectName || ""}" لشهر ${monthLabel(r.month || currentMonthKey())} للطالب ${r.name} - Al Ola Center. شكراً لكم.`;

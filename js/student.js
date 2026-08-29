@@ -305,13 +305,16 @@ function renderAll(student, code) {
   document.getElementById("ex_subjectsCount").textContent = billingGroups.length;
 
   const statusWrap = document.getElementById("ex_subjectsStatus");
+  const subscriptionDates = student.subscriptionDates || {};
   if (!billingGroups.length) {
     statusWrap.innerHTML = '<p class="empty-box">لا توجد مواد مسجلة</p>';
   } else {
     statusWrap.innerHTML = billingGroups
       .map((g) => {
         const isPaid = isBillingGroupPaid(g, monthPayments);
-        return `<div class="pay-row"><div class="info"><b>${escapeHtml(g.name)}</b>${escapeHtml(g.fee || 0)} جنيه</div><span class="badge ${isPaid ? "success" : "danger"}">${isPaid ? "مدفوع ✓" : "غير مدفوع ✗"}</span></div>`;
+        const sub = formatSubscriptionStatus(subscriptionDates[g.billingKey]);
+        const subLine = sub.state && sub.state !== "never" ? `<div style="font-size:11.5px; margin-top:3px; color:${sub.state === "active" ? "var(--success)" : "var(--pink)"};">📅 ${escapeHtml(sub.text)}</div>` : "";
+        return `<div class="pay-row"><div class="info"><b>${escapeHtml(g.name)}</b>${escapeHtml(g.fee || 0)} جنيه${subLine}</div><span class="badge ${isPaid ? "success" : "danger"}">${isPaid ? "مدفوع ✓" : "غير مدفوع ✗"}</span></div>`;
       })
       .join("");
   }
@@ -395,6 +398,7 @@ document.getElementById("payForm").addEventListener("submit", async (e) => {
     await db.ref("paymentRequests").push({
       code: currentCode,
       name: currentStudent.name,
+      billingKey: opt.value, // مفتاح المادة/المدرس - لازم لتحديث دورة الاشتراك 30 يوم عند الموافقة
       subjectKeys: (opt.dataset.keys || "").split(",").filter(Boolean), // كل مفاتيح المجموعات المرتبطة بنفس المدرس/المادة
       subjectName: opt.dataset.name,
       amount: document.getElementById("pf_amount").value,

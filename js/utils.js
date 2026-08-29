@@ -108,6 +108,37 @@ function isBillingGroupPaid(group, monthPayments) {
   return group.subjectKeys.some((k) => !!(monthPayments || {})[k]);
 }
 
+/* ==========================================================
+   دورة الاشتراك 30 يوم (Subscription Cycle) - بديل عادل لتصفير الحساب مع بداية
+   كل شهر ميلادي: لو الطالب دفع يوم 1، الاشتراك بيفضل ساري لحد يوم 31 بالظبط (30
+   يوم كاملة)، ولو دفع يوم 15 بيفضل ساري لحد يوم 15 من الشهر اللي بعده - بالظبط
+   30 يوم من تاريخ الدفع الفعلي، مش من أول الشهر. بيتخزن في:
+   students/{code}/subscriptionDates/{billingKey} = "2026-08-15T10:00:00.000Z"
+   ========================================================== */
+const SUBSCRIPTION_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/* بيرجع عدد الأيام المتبقية لحد ما يجي معاد الدفع الجاي:
+   - null: لسه الطالب مدفعش الاشتراك ده أبداً
+   - رقم موجب: باقي كام يوم للموعد الجاي (وبينقص كل يوم تلقائياً لأنه بيتحسب حي من التاريخ الحالي)
+   - صفر أو سالب: الاشتراك خلص/متأخر بعدد الأيام دي بالظبط */
+function getSubscriptionDaysRemaining(lastPaidISO) {
+  if (!lastPaidISO) return null;
+  const paidAt = new Date(lastPaidISO).getTime();
+  if (isNaN(paidAt)) return null;
+  const dueAt = paidAt + SUBSCRIPTION_DAYS * DAY_MS;
+  return Math.ceil((dueAt - Date.now()) / DAY_MS);
+}
+
+/* نص جاهز للعرض + حالة (active/due/never) لاستخدامه في أي واجهة */
+function formatSubscriptionStatus(lastPaidISO) {
+  const days = getSubscriptionDaysRemaining(lastPaidISO);
+  if (days === null) return { text: "لسه مدفعش الاشتراك ده أبداً", state: "never", days: null };
+  if (days > 0) return { text: `الاشتراك ساري - باقي ${days} يوم للموعد الجاي`, state: "active", days };
+  if (days === 0) return { text: "الاشتراك بيخلص النهاردة بالظبط", state: "due", days };
+  return { text: `الاشتراك انتهى من ${Math.abs(days)} يوم - محتاج تجديد`, state: "overdue", days };
+}
+
 /* ---------- شهر الدفع الحالي بصيغة 2026-08 ---------- */
 function currentMonthKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;

@@ -334,6 +334,9 @@ table.data-table tr:last-child td{ border-bottom:none; }
 .badge.success{ background:#E4FBF2; color: var(--success); }
 .badge.danger{ background:#FDEDF2; color: var(--pink); }
 .badge.pending{ background:#FFF4E0; color:#D3941D; }
+.text-success{ color: var(--success); }
+.text-danger{ color: var(--pink); }
+.text-pending{ color:#D3941D; }
 
 /* ===== Search box (3-square grade entry) ===== */
 .step-box{

@@ -6,13 +6,14 @@
 <title>لوحة تحكم الأدمن - Al Center</title>
 <link rel="stylesheet" href="css/style.css">
 
-<!-- PWA Settings -->
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#3498db">
+<!-- PWA Settings - لوحة الأدمن ليها Manifest خاص بيها منفصل عن صفحة الطالب،
+     عشان تتثبت كتطبيق مستقل على سطح المكتب باسم وأيقونة خاصة بيها -->
+<link rel="manifest" href="admin-manifest.json">
+<meta name="theme-color" content="#0a1730">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="سنتر العلا">
-<link rel="apple-touch-icon" href="images/icon-192.png">
+<meta name="apple-mobile-web-app-title" content="لوحة الأدمن">
+<link rel="apple-touch-icon" href="android/launchericon-192x192.png">
 
   
 </head>
@@ -20,6 +21,7 @@
 
 <div class="topbar">
   <div class="topbar-actions">
+    <button class="btn-pill hidden" id="installAppBtn">📲 <span>تثبيت التطبيق</span></button>
     <button class="btn-pill" id="logoutBtn"><span>تسجيل الخروج</span> 🚪</button>
   </div>
   <div class="topbar-brand" style="display:flex; align-items:center; gap:10px;">
